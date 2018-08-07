@@ -14,6 +14,7 @@ from Evaluation_tool import EvaluationTool
 from matplotlib import pyplot as plt
 import matplotlib.dates as mdates
 import csv
+import os
 import datetime
 import matplotlib
 import datetime
@@ -24,12 +25,12 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
 
-baseline_working_directory = ("//Users//jeremiasknoblauch//Documents//OxWaSP"+
-    "//BOCPDMS//Code//SpatialBOCD//Paper//NileData")
-nile_file = ("//Users//jeremiasknoblauch//Documents//OxWaSP"+
-    "//BOCPDMS//Code//SpatialBOCD//Data//nileData//nile.txt")
-results_file = ("//Users//jeremiasknoblauch//Documents//OxWaSP"+
-    "//BOCPDMS//Code//SpatialBOCD//Paper//NileData//results_nile.txt")
+# Set paths to original data and stored results
+baseline_working_directory = os.getcwd()
+nile_file = os.path.join(baseline_working_directory, "Data", "nile.txt")
+results_file = os.path.join(baseline_working_directory, "Output", "results_nile.txt")
+if not os.path.isfile(results_file):
+    print("\nCould not find results_nile.txt in the Output directory. Have you run nile_ICML18.py?\n")
 
 
 """Read in raw data"""
@@ -154,7 +155,7 @@ EvT.plot_run_length_distr(
 #                         plot_type = "MAPVariance1_det", show_MAP_CPs = True)
     
 
-fig.savefig(baseline_working_directory + "//nile_plot.pdf",
-            format = "pdf", dpi = 800)
-fig.savefig(baseline_working_directory + "//nile_plot.jpg",
-            format = "jpg", dpi = 800)
+fig.savefig(os.path.join(baseline_working_directory, "output", "nile_plot.pdf"),
+            format="pdf", dpi=800)
+fig.savefig(os.path.join(baseline_working_directory, "output", "nile_plot.png"),
+            format="png", dpi=800)

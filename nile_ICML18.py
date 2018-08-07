@@ -20,11 +20,9 @@ from detector import Detector
 from Evaluation_tool import EvaluationTool
 
 
-"""STEP 1: Set the current working directory. If you are on a OS X machine,
-you need the second line for your machine to understand the path"""
+"""STEP 1: Set the current working directory."""
 baseline_working_directory = os.getcwd()
-baseline_working_directory = baseline_working_directory.replace("/", "//") 
-nile_file = baseline_working_directory + "//Data//nile.txt"
+nile_file = os.path.join(baseline_working_directory, "Data", "nile.txt")
 
 
 """STEP 2: Read in the nile data from nile.txt"""
@@ -112,6 +110,7 @@ detector.run()
 """STEP 10: Store results into EvaluationTool object with plotting capability"""
 EvT = EvaluationTool()
 EvT.build_EvaluationTool_via_run_detector(detector)
+EvT.store_results_to_HD(os.path.join(baseline_working_directory, "Output", "results_nile.txt"))
         
 
 """STEP 11: Inspect convergence of the hyperparameters"""
@@ -183,8 +182,8 @@ EvT.plot_run_length_distr(buffer=0, show_MAP_CPs = True,
     arrow_distance = 25)
     
 #save the plot in current directory
-fig.savefig(baseline_working_directory + "//nile_plot.pdf",
-            format = "pdf", dpi = 800) 
+fig.savefig(os.path.join(baseline_working_directory, "Output", "nile_plot.pdf"),
+            format="pdf", dpi=800)
 
 """STEP 13: Also plot some performance indicators (will usually be printed 
 to the console before the plots)"""
