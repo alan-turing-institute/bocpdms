@@ -11,6 +11,7 @@ Description: Reads in the nile data and processes it as a demo
 """System packages/modules"""
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy
 import csv
 import os
 """Modules of the BOCPDMS algorithm"""
@@ -188,5 +189,10 @@ fig.savefig(os.path.join(baseline_working_directory, "Output", "nile_plot.pdf"),
 """STEP 13: Also plot some performance indicators (will usually be printed 
 to the console before the plots)"""
 print("CPs are ", detector.CPs[-2])
-print("MSE is", np.mean(detector.MSE))
-print("NLL is", np.mean(detector.negative_log_likelihood))
+
+# MSE would have spatial dimensions, but this dataset is univariate - so extract the MSE from the array before printing
+print("MSE is %.5g with 95%% error of %.5g" %
+      (np.mean(detector.MSE), 1.96*scipy.stats.sem(detector.MSE)))
+
+print("NLL is %.5g with 95%% error of %.5g" %
+      (np.mean(detector.negative_log_likelihood), 1.96*scipy.stats.sem(detector.negative_log_likelihood)))
