@@ -20,10 +20,9 @@ from cp_probability_model import CpModel
 
 
 baseline_working_directory = os.getcwd()
-baseline_working_directory = baseline_working_directory.replace("/", "//") 
-baseline_working_directory = baseline_working_directory + "//Data"
-whistler_data = baseline_working_directory + "//whistler_data.csv"
-whistler_dates = baseline_working_directory + "//whistler_dates.csv"
+whistler_data = os.path.join(baseline_working_directory, "Data", "whistler_data.csv")
+whistler_dates = os.path.join(baseline_working_directory, "Data", "whistler_dates.csv")
+whistler_results = os.path.join(baseline_working_directory, "Output", "results_whistler.txt")
 
 
 """STEP 0: Decide what to do"""
@@ -135,19 +134,21 @@ detector = Detector(data=data,
         save_performance_indicators = True)
 detector.run()
 
-"""Store results + real CPs into EvaluationTool obj"""
+"""Store results + real CPs into EvaluationTool obj and save"""
 EvT = EvaluationTool()
 EvT.build_EvaluationTool_via_run_detector(detector)
-        
+EvT.store_results_to_HD(whistler_results)
 
 """plot transformed data"""
 fig = EvT.plot_raw_TS(data.reshape(T,1))
+
 """plot prediction error"""
 fig = EvT.plot_prediction_error(data, indices=[0], print_plt=True,
                                 time_range = np.linspace(2*365,
                              T-upper_AR-1,
                              T-upper_AR-1-2*365,
                              dtype=int))
+
 """plot predictions themselves"""
 fig = EvT.plot_predictions(
         indices = [0], print_plt = True, 
@@ -160,20 +161,7 @@ fig = EvT.plot_predictions(
 
 plt.show()
 
-print("************PRED MSE + NLL AS IN PAPER************")
-print("MSE", np.sum(np.mean(detector.MSE, axis=0)))
-print("NLL", np.mean(detector.negative_log_likelihood))
-print("**************************************************")
-
-
-
-
-
-
-
-
-
-
-
-
-
+print("\n")
+print("***** Predictive MSE + NLL from Table 1 in ICML 2018 paper *****")
+print("MSE is %.5g" % (np.sum(np.mean(detector.MSE, axis=0))))
+print("NLL is %.5g" % (np.mean(detector.negative_log_likelihood)))
