@@ -124,16 +124,37 @@ def test_add_true_cps(example_detector):
     det = example_detector
     det.run()
 
-    # Add the true CPs to the evt
+    true_cp_index = 50
+    true_cp_model_index = 2
+
+    # Add CPs to the EvT before setting it up with the detector:
+
+    # Set up the EvT
     evt = EvaluationTool()
     assert evt.has_true_CPs is False
-    evt.add_true_CPs(50, 4)
+    evt.add_true_CPs(true_cp_index, true_cp_model_index)
     assert evt.has_true_CPs is True
 
     # Build the evt using the detector, then check that true CP is stored in results
     evt.build_EvaluationTool_via_run_detector(det)
     assert evt.results[evt.results[0].index("has true CPs")] is True
-    assert evt.results[evt.results[0].index("true CP locations")] == 50
+    assert evt.results[evt.results[0].index("true CP locations")] == true_cp_index
+    assert evt.results[evt.results[0].index("true CP model index")] == true_cp_model_index
+    assert evt.results[evt.results[0].index("true CP model labels")] is None
+
+    # Add CPs to the EvT after setting it up with the detector:
+
+    # Set up the EvT
+    evt2 = EvaluationTool()
+    evt2.build_EvaluationTool_via_run_detector(det)
+    evt2.add_true_CPs(true_cp_index, true_cp_model_index)
+
+    # Check that CPs are still stored correctly if added after the detector has been run
+    assert evt2.has_true_CPs is True
+    assert evt2.results[evt.results[0].index("has true CPs")] is True
+    assert evt2.results[evt.results[0].index("true CP locations")] == true_cp_index
+    assert evt2.results[evt.results[0].index("true CP model index")] == true_cp_model_index
+    assert evt2.results[evt.results[0].index("true CP model labels")] is None
 
 
 def test_initialise_from_not_run_detector(example_detector):

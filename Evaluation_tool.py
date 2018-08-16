@@ -70,6 +70,11 @@ class EvaluationTool:
                       "all retained run lengths",
                       "has true CPs", "true CP locations",
                       "true CP model index", "true CP model labels"]
+
+        """Initialise the list of results: empty apart from names and no true CPs"""
+        self.results = [None]*len(self.names)
+        self.results[self.names.index("names")] = self.names
+        self.results[self.names.index("has true CPs")] = False
         
         """NOTE: Plotting will work with 7 different colors and 4 different
                  line styles!"""
@@ -241,12 +246,18 @@ class EvaluationTool:
         CP location. *true_CP_model_label* gives you the string label of the
         true DGP starting at the CP, e.g. 
         true_CP_model_label = ["BVAR(4,4,1)", "BVAR(1,1,1,1,1)"]."""
+
+        # Store CPs and their properties in the EvT
         self.true_CP_location = true_CP_location
         self.true_CP_model_index = true_CP_model_index
-        #if self.model_labels is None:
-        #    self.model_labels = true_CP_model_label
         self.true_CP_model_label = true_CP_model_label
         self.has_true_CPs = True
+
+        # Update the values in results
+        self.results[self.results[0].index("true CP locations")] = self.true_CP_location
+        self.results[self.results[0].index("true CP model index")] = self.true_CP_model_index
+        self.results[self.results[0].index("true CP model labels")] = self.true_CP_model_label
+        self.results[self.results[0].index("has true CPs")] = self.has_true_CPs
         
         
     """*********************************************************************
