@@ -59,8 +59,7 @@ class EvaluationTool:
         arguments), or you give it the path to data that has been stored from
         a previous experiment"""
         self.type = None
-        self.has_true_CPs = False
-        self.names = ["names", "execution time", "S1", "S2", "T", 
+        self.names = ["names", "execution time", "S1", "S2", "T",
                       "trimmer threshold", "MAP CPs", "model labels",
                       "run length log distribution",
                       "model and run length log distribution",
@@ -68,7 +67,7 @@ class EvaluationTool:
                       "one-step-ahead predicted variance",
                       "all run length log distributions",
                       "all model and run length log distributions",
-                      "all retained run lenghts",
+                      "all retained run lengths",
                       "has true CPs", "true CP locations",
                       "true CP model index", "true CP model labels"]
         

@@ -95,7 +95,7 @@ def test_constructor():
                          "one-step-ahead predicted variance",
                          "all run length log distributions",
                          "all model and run length log distributions",
-                         "all retained run lenghts",
+                         "all retained run lengths",
                          "has true CPs",  "true CP locations",
                          "true CP model index", "true CP model labels"]
 
