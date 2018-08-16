@@ -115,7 +115,6 @@ def test_initialise_from_run_detector(example_detector):
     assert 1.6059882853108407 == pytest.approx(np.mean(evt.negative_log_likelihood), 1e-8)
 
     # Check the structure of the list of results
-    # Todo: fix the method of generating the results list in Evaluation_tool
     assert evt.names == evt.results[0]              # Names of quantities are duplicated; should be the same
     assert len(evt.results[0]) == len(evt.results)  # Check that the number of names corresponds to the no. results
 
@@ -131,13 +130,10 @@ def test_add_true_cps(example_detector):
     evt.add_true_CPs(50, 4)
     assert evt.has_true_CPs is True
 
-    # Build the evt using the detector, then check that true CPs are stored in results
-    # Todo: fix the method of generating the results list in Evaluation_tool and remove duplication
+    # Build the evt using the detector, then check that true CP is stored in results
     evt.build_EvaluationTool_via_run_detector(det)
-    assert "has true CPs" in evt.results[0]         # From constructor
-    assert "has true CP" in evt.results[0]          # From store_detector_results_to_object
     assert evt.results[evt.results[0].index("has true CPs")] is True
-    assert evt.results[evt.results[0].index("has true CP")] is True
+    assert evt.results[evt.results[0].index("true CP locations")] == 50
 
 
 def test_initialise_from_not_run_detector(example_detector):

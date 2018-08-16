@@ -61,16 +61,16 @@ class EvaluationTool:
         self.type = None
         self.has_true_CPs = False
         self.names = ["names", "execution time", "S1", "S2", "T", 
-                 "trimmer threshold", "MAP CPs", "model labels",
-                     "run length log distribution", 
-                     "model and run length log distribution", 
-                     "one-step-ahead predicted mean",
-                     "one-step-ahead predicted variance",
-                     "all run length log distributions",
-                     "all model and run length log distributions",
-                     "all retained run lenghts",
-                     "has true CPs",  "true CP locations", 
-                     "true CP model index", "true CP model labels"]
+                      "trimmer threshold", "MAP CPs", "model labels",
+                      "run length log distribution",
+                      "model and run length log distribution",
+                      "one-step-ahead predicted mean",
+                      "one-step-ahead predicted variance",
+                      "all run length log distributions",
+                      "all model and run length log distributions",
+                      "all retained run lenghts",
+                      "has true CPs", "true CP locations",
+                      "true CP model index", "true CP model labels"]
         
         """NOTE: Plotting will work with 7 different colors and 4 different
                  line styles!"""
@@ -326,31 +326,23 @@ class EvaluationTool:
             else:
                 self.model_labels[i] = class_label
         
-        
         """STEP 3: Sum them all up in a results-object"""
         self.results = [self.execution_time, self.S1, self.S2, self.T, 
-                   self.threshold, self.CPs, self.model_labels,
-                       self.run_length_log_distr, 
-                       self.model_and_run_length_log_distr,
-                       self.storage_mean, self.storage_var, 
-                       self.storage_run_length_log_distr, 
-                       self.storage_model_and_run_length_log_distr, #,
-                       self.storage_all_retained_run_lengths
-                       ]
+                        self.threshold, self.CPs, self.model_labels,
+                        self.run_length_log_distr,
+                        self.model_and_run_length_log_distr,
+                        self.storage_mean, self.storage_var,
+                        self.storage_run_length_log_distr,
+                        self.storage_model_and_run_length_log_distr,
+                        self.storage_all_retained_run_lengths,
+                        self.has_true_CPs, self.true_CP_location,
+                        self.true_CP_model_index, self.true_CP_model_label]
+
         if self.detector.save_performance_indicators:
             self.names.append("MSE")
             self.names.append("NLL")
             self.results.append(self.MSE)
             self.results.append(self.negative_log_likelihood)
-        if self.has_true_CPs:
-            self.names.append("has true CP")
-            self.names.append("true CP location")
-            self.names.append("true CP model index")
-            self.names.append("true CP model label")
-            self.results.append(self.has_true_CPs)
-            self.results.append(self.true_CP_location)
-            self.results.append(self.true_CP_model_index)
-            self.results.append(self.true_CP_model_label)
             
         """append the names to the front of results"""
         self.results.insert(0, self.names)
