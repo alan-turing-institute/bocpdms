@@ -112,7 +112,6 @@ detector.run()
 EvT = EvaluationTool()
 EvT.build_EvaluationTool_via_run_detector(detector)
 EvT.store_results_to_HD(os.path.join(baseline_working_directory, "Output", "results_nile.txt"))
-        
 
 """STEP 11: Inspect convergence of the hyperparameters"""
 for lag in range(0, upper_AR+1-lower_AR):
@@ -123,70 +122,7 @@ for lag in range(0, upper_AR+1-lower_AR):
                          len(detector.model_universe[lag].b_list)), 
              np.array(detector.model_universe[lag].b_list))
 
-
-"""STEP 12: Obtain plots of raw data and segmentation"""
-#set some arguments for the plots
-height_ratio =[10,14]
-custom_colors = ["blue", "purple"] 
-fig, ax_array = plt.subplots(2, figsize=(8,5), sharex = True, 
-                             gridspec_kw = {'height_ratios':height_ratio})
-plt.subplots_adjust(hspace = .35, left = None, bottom = None,
-                    right = None, top = None)
-ylabel_coords = [-0.065, 0.5]
-
-#Plot of raw Time Series
-EvT.plot_raw_TS(river_height[2:].reshape(T-2,1), indices = [0], xlab = None, 
-        show_MAP_CPs = True, 
-        time_range = np.linspace(1,T-2, T-2, dtype=int), 
-        print_plt = False,
-        ylab = "River Height", ax = ax_array[0],
-        all_dates = np.linspace(622 + 1, 1284, 1284 - (622 + 1), dtype = int),
-        custom_colors_series = ["black"],
-        custom_colors_CPs = ["blue", "blue"]* 10,
-        custom_linestyles = ["solid"]*10,
-        ylab_fontsize = 14,
-        ylabel_coords = ylabel_coords)
-                           
-#Run length distribution plot
-EvT.plot_run_length_distr(buffer=0, show_MAP_CPs = True, 
-                                   mark_median = False, 
-    mark_max = True, upper_limit = 660, print_colorbar = True, 
-    colorbar_location= 'bottom',
-    space_to_colorbar = 0.52,
-    log_format = True, aspect_ratio = 'auto', 
-    C1=0,C2=1, 
-    time_range = np.linspace(1,
-                             T-2, 
-                             T-2, dtype=int), 
-    start = 622 + 2, stop = 1284, 
-    all_dates = None, 
-    event_time_list=[715 ],
-    label_list=["nilometer"], 
-    custom_colors = ["blue", "blue"] * 30, 
-    custom_linestyles = ["solid"]*30,
-    custom_linewidth = 3,
-    arrow_colors= ["black"],
-    number_fontsize = 14,
-    arrow_length = 135,
-    arrow_thickness = 3.0,
-    xlab_fontsize =14,
-    ylab_fontsize = 14, 
-    arrows_setleft_indices = [0],
-    arrows_setleft_by = [50],
-    zero_distance = 0.0,
-    ax = ax_array[1], figure = fig,
-    no_transform = True,
-    date_instructions_formatter = None, 
-    date_instructions_locator = None,
-    ylabel_coords = ylabel_coords,
-    xlab = "Year",
-    arrow_distance = 25)
-    
-#save the plot in current directory
-fig.savefig(os.path.join(baseline_working_directory, "Output", "nile_plot.pdf"),
-            format="pdf", dpi=800)
-
-"""STEP 13: Also plot some performance indicators (will usually be printed 
+"""STEP 12: Also plot some performance indicators (will usually be printed 
 to the console before the plots)"""
 print("\nCPs are ", detector.CPs[-2])
 print("\n***** Predictive MSE + NLL from Table 1 in ICML 2018 paper *****")
