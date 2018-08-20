@@ -8,9 +8,11 @@ Created on Mon Jan  8 14:01:35 2018
 Description: Process the bee data with the multiple-model BOCD algorithm
 """
 
-import csv, os
+import csv
+import os
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import stats
 
 from cp_probability_model import CpModel
 from BVAR_NIG import BVARNIG
@@ -21,15 +23,14 @@ from Evaluation_tool import EvaluationTool
 normalize = True #we normalize as Saatci et al. (2010) do 
                  #(see also the code of Turner (2012))
 
-baseline_working_directory = os.getcwd()
-baseline_working_directory = baseline_working_directory.replace("/", "//") 
-baseline_working_directory = baseline_working_directory + "//Data"
+data_directory = os.path.join(os.getcwd(), "Data")
+output_directory = os.path.join(os.getcwd(), "Output")
 
 """STEP 2: Plug in WHICH of the bee waggle sets you want to process"""
 waggle_id = 1 #which of the 6 data sets we want. 
               #Turner (2012) & Saatci et al. (2010) analyze the first
 coupling = "weak coupling"
-file_name = baseline_working_directory + "//bee_seq" + str(waggle_id) + ".csv"
+file_name = os.path.join(data_directory, "bee_seq" + str(waggle_id) + ".csv")
 
 
 """STEP 3: We need to set up the potential neighbourhoods. It is reasonable 
@@ -119,8 +120,8 @@ lower_AR = 1
 upper_VAR = int(mult*pow(float(T)/np.log(T), 1.0/6.0) + 1)
 lower_VAR = 1
 
-    
-        
+
+
 """STEP 5.6: Set up the intensity prior"""
 cp_model = CpModel(intensity)
 
@@ -135,7 +136,7 @@ for lag in range(lower_AR, upper_AR+1):
                     intercept_grouping = grouping,
                     general_nbh_sequence = AR_nbh_elem,
                     general_nbh_restriction_sequence = AR_res_elem * lag,
-                    general_nbh_coupling = "weak coupling", 
+                    general_nbh_coupling = "weak coupling",
                     hyperparameter_optimization = hyperpar_opt)]
 
 VAR_models = []
@@ -164,18 +165,18 @@ for lag in range(lower_VAR, upper_VAR+1):
                     general_nbh_restriction_sequence = mixed_res_elem * lag,
                     general_nbh_coupling = "weak coupling",
                     hyperparameter_optimization = hyperpar_opt)]
-    
+
 #put models together
 model_universe = np.array(AR_models + VAR_models + mixed_models)
 
 #uniform prior
 model_prior = np.array([1/len(model_universe)]*len(model_universe))
 
-                
+
 """STEP 6: Build and run detector"""
-detector = Detector(data=data, model_universe=model_universe, 
+detector = Detector(data=data, model_universe=model_universe,
         model_prior = model_prior,
-        cp_model = cp_model, S1 = S1, S2 = S2, T = T, 
+        cp_model = cp_model, S1 = S1, S2 = S2, T = T,
         store_rl=True, store_mrl=True,
         trim_type="keep_K", threshold = 200,
         notifications = 100,
@@ -188,17 +189,19 @@ detector.run()
 
 """Store results + real CPs into EvaluationTool obj"""
 EvT = EvaluationTool()
-EvT.add_true_CPs(true_CP_location=true_CP_location, 
-                 true_CP_model_index=true_CP_location, 
-             true_CP_model_label = -1)
+EvT.add_true_CPs(true_CP_location=true_CP_location,
+                 true_CP_model_index=true_CP_location,
+                 true_CP_model_label=-1)
 EvT.build_EvaluationTool_via_run_detector(detector)
+EvT.store_results_to_HD(os.path.join(output_directory, "results_bee.txt"))
+# EvT.build_EvaluationTool_via_results(os.path.join(output_directory, "results_bee.txt"))
 
 print("convergence diagnostics for on-line hyperparameter opt:")
-plt.plot(np.linspace(1,len(detector.model_universe[0].a_list), 
-                     len(detector.model_universe[0].a_list)), 
+plt.plot(np.linspace(1,len(detector.model_universe[0].a_list),
+                     len(detector.model_universe[0].a_list)),
          np.array(detector.model_universe[0].a_list))
 plt.plot(np.linspace(1,len(detector.model_universe[0].b_list),
-                     len(detector.model_universe[0].b_list)), 
+                     len(detector.model_universe[0].b_list)),
          np.array(detector.model_universe[0].b_list))
 
 fig = EvT.plot_run_length_distr(
@@ -219,7 +222,11 @@ fig = EvT.plot_run_length_distr(
 
 plt.show()
 
-print("************PRED MSE + NLL AS IN PAPER************")
-print("MSE", np.sum(np.mean(detector.MSE, axis=0)))
-print("NLL", np.mean(detector.negative_log_likelihood))
-print("**************************************************")
+"""Print results for paper"""
+
+print("\n")
+print("***** Predictive MSE + NLL from Table 1 in ICML 2018 paper *****")
+print("MSE is %.5g with 95%% error of %.5g" %
+      (np.sum(np.mean(detector.MSE, axis=0)), np.sum(1.96*stats.sem(detector.MSE))))
+print("NLL is %.5g with 95%% error of %.5g" %
+      (np.mean(detector.negative_log_likelihood), 1.96*stats.sem(detector.negative_log_likelihood)))
