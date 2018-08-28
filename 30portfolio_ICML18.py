@@ -22,24 +22,24 @@ from cp_probability_model import CpModel
 
 run_detectors = True
 normalize = False
-shortened, shortened_T = False, 350 #if true, only run the first shortened_T 
+shortened, shortened_T = False, 350 #if true, only run the first shortened_T
                                     #observations
 
 """folder containing dates and data (with result folders being created at 
 run-time if necessary)"""
 baseline_working_directory = os.getcwd()
-baseline_working_directory = baseline_working_directory.replace("/", "//") 
-baseline_working_directory = baseline_working_directory + "//Data//30PF"
+data_directory = os.path.join(baseline_working_directory, "Data", "30PF")
+results_directory = os.path.join(baseline_working_directory, "Output", "30PF")
 
 """dates, e.g. 25/12/1992 is 19921225, corresponding to the observations"""
-file_name_dates = baseline_working_directory + "//portfolio_dates.csv"
+file_name_dates = os.path.join(data_directory, "portfolio_dates.csv")
 
 """30 Portfolio data. In same order as original data set"""
-file_name_data = baseline_working_directory + "//portfolio_data.csv"
+file_name_data = os.path.join(data_directory, "portfolio_data.csv")
 
 """prototype of the portfolio grouping names that give the list of nbhs 
 for each location, i.e. give the list of nbhs for each Portfolio."""
-file_name_nbhs_proto = baseline_working_directory + "//portfolio_grouping_"
+file_name_nbhs_proto = os.path.join(data_directory, "portfolio_grouping_")
 
 """Modes when running the code"""
 build_weak_coupling = True
@@ -58,10 +58,9 @@ time_frame = "comparison"    # "comparison",last_20", last_10;
 
 
 """STEP 0: Define helper function(s)"""
-def read_nbhs(baseline_working_directory, mode):
+def read_nbhs(data_dir, mode):
     """STEP 1: Read in the cutoffs"""
-    cutoffs_file = (baseline_working_directory + "//" + mode +
-                    "//portfolio_grouping_cutoffs.csv")
+    cutoffs_file = os.path.join(data_dir, mode, "portfolio_grouping_cutoffs.csv")
     mylist_cutoffs = []
     count = 0
     with open(cutoffs_file) as csvfile:
@@ -72,22 +71,19 @@ def read_nbhs(baseline_working_directory, mode):
             count+=1
     
     """STEP 2: Determine the number of nbhs and the number of decades stored"""
-    num_decades = (len([x[0] for x in os.walk(baseline_working_directory + 
-                       "//" + mode)]) - 1)
+    num_decades = (len([x[0] for x in os.walk(os.path.join(data_dir, mode))]) - 1)
     num_nbhs  = len(mylist_cutoffs)-2 #-2 because this includes 0 and 0.99
     
     """STEP 3: For each decade, read in the nbh structure"""
     list_of_nbhs_all_decades = []
     for decade in range(1, num_decades+1):
-        decade_folder = (baseline_working_directory + "//" + mode + 
-                             "//decade_" + str(decade)) 
+        decade_folder = os.path.join(data_dir, mode, "decade_" + str(decade))
         
     
         """STEP 3.1: Read in the list of nbhs for the current decade"""
         list_of_nbhs = []
         for nbh_count in range(1, num_nbhs+1):
-            nbh_file = (decade_folder + "//portfolio_grouping_" + 
-                        str(nbh_count) + ".csv")
+            nbh_file = os.path.join(decade_folder, "portfolio_grouping_" + str(nbh_count) + ".csv")
             mylist_helper = []
                 
             """read in"""
@@ -187,9 +183,9 @@ grouping = grouping.reshape((S1*S2, S1,S2))
 mode1 = "contemporaneous"
 mode2 = "autocorr"
 num_decades_contemp, num_nbhs_contemp, contemp_nbhs = (
-        read_nbhs(baseline_working_directory, mode1))
+        read_nbhs(data_directory, mode1))
 num_decades_autocorr, num_nbhs_autocorr, autocorr_nbhs = (
-        read_nbhs(baseline_working_directory, mode2))
+        read_nbhs(data_directory, mode2))
 
 """STEP 4.2: Depending on the mode, select decades of interest"""
 if time_frame == "comparison":
@@ -511,37 +507,42 @@ if run_detectors:
                     EvT = EvaluationTool()
                     EvT.build_EvaluationTool_via_run_detector(detector)
                             
-                    """store that EvT object onto hard drive"""
-                    prior_spec_str = ("//time_frame=" + time_frame +  
-                            "//transform=" +str(heavy_tails_transform) +
-                            "//a=" + str(a) + "//b=" + str(b))
-                    detector_path = baseline_working_directory + prior_spec_str
+                    """Store that EvT object onto hard drive"""
+                    detector_path = os.path.join(results_directory, "time_frame=" + time_frame,
+                                                 "transform=" + str(heavy_tails_transform),
+                                                 "a=" + str(a), "b=" + str(b))
+
                     if not os.path.exists(detector_path):
                         os.makedirs(detector_path)
                     
-                    results_path = detector_path + "//results.txt" 
-                    if not shortened:
-                        EvT.store_results_to_HD(results_path)
-                    
-                    fig = EvT.plot_predictions(
-                            indices = [0], print_plt = True, 
-                            legend = False, 
-                            legend_labels = None, 
-                            legend_position = None, 
-                            time_range = None,
-                            show_var = False, 
-                            show_CPs = True)
-                    plt.close(fig)
-                    fig = EvT.plot_run_length_distr(
-                        print_plt = True, 
-                        time_range = None,
-                        show_MAP_CPs = True, 
-                        show_real_CPs = False,
-                        mark_median = False, 
-                        log_format = True,
-                        CP_legend = False, 
-                        buffer = 50)
-                    plt.close(fig)
+                    if shortened:
+                        EvT.store_results_to_HD(os.path.join(detector_path,
+                                                             "results_30portfolios_short" + str(shortened_T) + ".txt"))
+                    else:
+                        EvT.store_results_to_HD(os.path.join(detector_path, "results_30portfolios.txt"))
+
+                    fig_p, ax_p = plt.subplots()
+                    EvT.plot_predictions(indices=[0],
+                                         print_plt=True,
+                                         legend=False,
+                                         legend_labels=None,
+                                         legend_position=None,
+                                         time_range=None,
+                                         show_var=False,
+                                         show_CPs=True,
+                                         ax=ax_p)
+                    plt.close(fig_p)
+
+                    fig_rld, ax_rld = plt.subplots()
+                    EvT.plot_run_length_distr(print_plt=True,
+                                              show_MAP_CPs=True,
+                                              show_real_CPs=False,
+                                              mark_median=False,
+                                              log_format=True,
+                                              CP_legend=False,
+                                              buffer=50,
+                                              ax=ax_rld)
+                    plt.close(fig_rld)
                     
                     plt.plot(np.linspace(1,
                                     len(detector.model_universe[0].a_list), 
