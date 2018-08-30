@@ -17,28 +17,23 @@ from matplotlib import pyplot as plt
 import csv
 import datetime
 import matplotlib
-import datetime
+import os
 
-#only needed if you want to generate demo data yourself
-from cp_probability_model import CpModel 
-from detector import Detector 
-import synthetic_simulations_prepare_data    
-import synthetic_simulations_prepare_models
-
-#ensure that we have type 1 fonts (for ICML publishing guiedlines)
+# Ensure that we have type 1 fonts (for ICML publishing guidelines)
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
-
-baseline_working_directory = ("/Users//jeremiasknoblauch//Documents////OxWaSP//BOCPDMS//Code//" + 
-    "SpatialBOCD//Paper//30PortfolioData")
+baseline_working_directory = os.getcwd()
+data_directory = os.path.join(baseline_working_directory, "Data", "30PF")
+results_directory = os.path.join(baseline_working_directory, "Output", "30PF", "time_frame=comparison",
+                                 "transform=True", "a=100", "b=0.001")
 date_file = "portfolio_dates.csv"
-results_file= "results_30PortfolioData_comparison.txt"
+results_file = "results_30portfolios.txt"
 
 """Read in the dates & results"""
 myl = []
 count = 0 
-with open(baseline_working_directory + "//" + date_file) as csvfile:
+with open(os.path.join(data_directory, date_file)) as csvfile:
     reader = csv.reader(csvfile)
     for row in reader:
         #DEBUG: Unclear if this is needed
@@ -53,7 +48,7 @@ for e in myl:
                               
 result_path = baseline_working_directory
 EvT = EvaluationTool()
-EvT.build_EvaluationTool_via_results(result_path + "//" + results_file) 
+EvT.build_EvaluationTool_via_results(os.path.join(results_directory, results_file))
 
 """Using the dates, select your range and indices: select 
 03/07/1975 -- 31/12/2008, i.e. find indices that correspond"""
@@ -354,8 +349,8 @@ _, myfig=EvT.plot_run_length_distr(buffer=0, show_MAP_CPs = True, mark_median = 
     ax = ax, figure = fig,
     xlab = "Year-Month")
 
-fig.savefig(baseline_working_directory + "//30portfolio_picture_financial_crisis.pdf",
-            format = "pdf", dpi = 800)
+fig.savefig(os.path.join(results_directory, "30portfolio_picture_financial_crisis.pdf"),
+            format="pdf", dpi=800)
 
 #start_day = datetime.date(2007, 8, 1)
 #stad = matplotlib.dates.date2num( start_day )
@@ -367,10 +362,3 @@ fig.savefig(baseline_working_directory + "//30portfolio_picture_financial_crisis
 #        log_format = True, show_MAP_CPs = False, 
 #        custom_colors = [custom_colors[ind]],
 #        start_axis = stad, stop_axis = stod)
-    
-    
-    
-    
-    
-    
-

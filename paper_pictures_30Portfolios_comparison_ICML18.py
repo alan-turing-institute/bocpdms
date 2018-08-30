@@ -13,25 +13,25 @@ from Evaluation_tool import EvaluationTool
 from matplotlib import pyplot as plt
 import csv
 import datetime
+import os
 import matplotlib
 from matplotlib import rcParams
 
-
-#ensure that we have type 1 fonts (for ICML publishing guidelines)
+# Ensure that we have type 1 fonts (for ICML publishing guidelines)
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 
-
-baseline_working_directory = ("//Users//jeremiasknoblauch//Documents//OxWaSP//BOCPDMS//" + 
-            "//Code//" + 
-    "SpatialBOCD//Paper//30PortfolioData")
+baseline_working_directory = os.getcwd()
+data_directory = os.path.join(baseline_working_directory, "Data", "30PF")
+results_directory = os.path.join(baseline_working_directory, "Output", "30PF", "time_frame=comparison",
+                                 "transform=True", "a=100", "b=0.001")
 date_file = "portfolio_dates.csv"
-results_file= "results_30PortfolioData_comparison.txt"
+results_file = "results_30portfolios.txt"
 
 """Read in the dates & results"""
 myl = []
 count = 0 
-with open(baseline_working_directory + "//" + date_file) as csvfile:
+with open(os.path.join(data_directory, date_file)) as csvfile:
     reader = csv.reader(csvfile)
     for row in reader:
         #Don't read in column header
@@ -47,9 +47,8 @@ for e in myl:
     dates.append(int(e))
 
 """Build the EvaluationTool from the results you have saved"""                              
-result_path = baseline_working_directory
 EvT = EvaluationTool()
-EvT.build_EvaluationTool_via_results(result_path + "//" + results_file) 
+EvT.build_EvaluationTool_via_results(os.path.join(results_directory, results_file))
 
 """Using the dates, select your range and indices: select 
 03/07/1975 -- 31/12/2008, i.e. find indices that correspond"""
@@ -159,46 +158,44 @@ if number_labels:
     for i in range(0, len(event_time_list)):
         label_list.append(str(i+1))
 
-
 """Obtain the plot for RLD"""
-fig, ax = plt.subplots(1, figsize=(20,5)) #20,5
-fig.subplot.top : 0.5
+fig, ax = plt.subplots(1, figsize=(20, 5))  # 20,5
+# fig.subplot.top : 0.5
 
-_, myfig = EvT.plot_run_length_distr(buffer=50, show_MAP_CPs = False, mark_median = False, 
-    mark_max = True, upper_limit = 285, 
-    print_colorbar = False, #True
-    colorbar_location= None, #'bottom',
-    log_format = True, aspect_ratio = 'auto', 
-    C1=700,C2=1, 
-    time_range = np.linspace(start_comparison - start_test,
-                             stop_comparison - start_test - 2, 
-                             stop_comparison-start_comparison-2, dtype=int), 
-    start=(1998 + 1/365), stop = 2009, 
-    all_dates = all_dates,
-    event_time_list=event_time_list, 
-    label_list=label_list, 
-    space_to_colorbar = 0.75, #0.6
-    arrow_colors= arrow_color_list,
-    xlab = "", #"Year"
-    ax = ax, figure = fig,
-    number_fontsize = 27, #14
-    xlab_fontsize =27,  #14
-    ylab_fontsize = 27,  #14
-    xticks_fontsize = 23,  #12
-    yticks_fontsize = 23, #12
-    arrow_length = 30, #32
-    arrow_thickness = 4.0,
-    arrows_setleft_indices = [3],
-    arrows_setleft_by = [datetime.timedelta(days = 35)],
-    zero_distance = datetime.timedelta(days=0)
-    #ylabel_coords = [10, 150]  #void
-    )
+_, myfig = EvT.plot_run_length_distr(buffer=50,
+                                     show_MAP_CPs=False,
+                                     mark_median=False,
+                                     mark_max=True,
+                                     upper_limit=285,
+                                     print_colorbar=True,  # True
+                                     colorbar_location="bottom",  # 'bottom',
+                                     log_format=True,
+                                     aspect_ratio='auto',
+                                     C1=700, C2=1,
+                                     time_range=np.linspace(start_comparison - start_test,
+                                                            stop_comparison - start_test - 2,
+                                                            stop_comparison - start_comparison - 2, dtype=int),
+                                     start=(1998 + 1 / 365), stop=2009,
+                                     all_dates=all_dates,
+                                     event_time_list=event_time_list,
+                                     label_list=label_list,
+                                     space_to_colorbar=0.75,  # 0.6
+                                     arrow_colors=arrow_color_list,
+                                     xlab="Year",  # "Year"
+                                     ax=ax, figure=fig,
+                                     number_fontsize=27,  # 14
+                                     xlab_fontsize=27,  # 14
+                                     ylab_fontsize=27,  # 14
+                                     xticks_fontsize=23,  # 12
+                                     yticks_fontsize=23,  # 12
+                                     arrow_length=30,  # 32
+                                     arrow_thickness=4.0,
+                                     arrows_setleft_indices=[3],
+                                     arrows_setleft_by=[datetime.timedelta(days=35)],
+                                     zero_distance=datetime.timedelta(days=0)
+                                     # ylabel_coords = [10, 150]  #void
+                                     )
     
 """Save the plot as pdf"""    
-fig.savefig(baseline_working_directory + "//30portfolio_picture_comparison.pdf",
-            format = "pdf", dpi = 800)
-fig.savefig(baseline_working_directory + "//30portfolio_picture_comparison.jpg",
-            format = "jpg", dpi = 800)    
-    
-    
-    
+fig.savefig(os.path.join(results_directory, "30portfolio_picture_comparison.pdf"),
+            format="pdf", dpi=800)
