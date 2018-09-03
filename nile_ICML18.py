@@ -114,13 +114,17 @@ EvT.build_EvaluationTool_via_run_detector(detector)
 EvT.store_results_to_HD(os.path.join(baseline_working_directory, "Output", "results_nile.txt"))
 
 """STEP 11: Inspect convergence of the hyperparameters"""
-for lag in range(0, upper_AR+1-lower_AR):
-    plt.plot(np.linspace(1,len(detector.model_universe[lag].a_list), 
-                         len(detector.model_universe[lag].a_list)), 
+for lag in range(0, upper_AR + 1 - lower_AR):
+    plt.plot(np.linspace(1, len(detector.model_universe[lag].a_list),
+                         len(detector.model_universe[lag].a_list)),
              np.array(detector.model_universe[lag].a_list))
-    plt.plot(np.linspace(1,len(detector.model_universe[lag].b_list),
-                         len(detector.model_universe[lag].b_list)), 
+    plt.plot(np.linspace(1, len(detector.model_universe[lag].b_list),
+                         len(detector.model_universe[lag].b_list)),
              np.array(detector.model_universe[lag].b_list))
+    plt.savefig(os.path.join(baseline_working_directory, "Output",
+                             "ICML18_ExtraFigure_Nile_ab_lag" + str(detector.model_universe[lag].lag_length) + ".pdf"),
+                format="pdf", dpi=800)
+    plt.cla()
 
 """STEP 12: Also plot some performance indicators (will usually be printed 
 to the console before the plots)"""
