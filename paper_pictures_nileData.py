@@ -8,6 +8,7 @@ Created on Sun Feb  4 17:18:58 2018
 Description: Get the Nile data pics
 """
 
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
@@ -17,7 +18,10 @@ from Evaluation_tool import EvaluationTool
 from nile_ICML18 import load_nile_data
 
 # Choose whether to generate and save additional figures (not used in the paper)
-save_extra_figures = False
+parser = argparse.ArgumentParser(description="Prepare figures related to the Nile dataset.")
+parser.add_argument("-e", "--extra", type=bool, default=False, help="Produce extra figures")
+args = parser.parse_args()
+save_extra_figures = args.extra
 
 # Ensure that we have type 1 fonts (for ICML publishing guidelines)
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -113,6 +117,8 @@ fig.savefig(os.path.join(baseline_working_directory, "Output", "ICML18_Figure5_N
             format="pdf", dpi=800)
 fig.savefig(os.path.join(baseline_working_directory, "Output", "ICML18_Figure5_Nile.png"),
             format="png", dpi=800)
+
+# Check that the figure has indeed been generated and report
 if os.path.isfile(os.path.join(baseline_working_directory, "Output", "ICML18_Figure5_Nile.pdf")):
     print("Figure 5 can be found in the Output directory")
 
@@ -127,6 +133,8 @@ if save_extra_figures:
                               up_to=250, ax=ax_pe)
     fig_pe.savefig(os.path.join(baseline_working_directory, "Output", "ICML18_ExtraFigure_Nile_PredError.pdf"),
                    format="pdf", dpi=800)
+    if os.path.isfile(os.path.join(baseline_working_directory, "Output", "ICML18_ExtraFigure_Nile_PredError.pdf")):
+        print("Extra plot of the prediction error can be found in the Output directory")
 
     # Plot the model posterior
     fig_mp, ax_mp = plt.subplots()
@@ -134,3 +142,5 @@ if save_extra_figures:
                              plot_type="MAPVariance1_det", show_MAP_CPs=True, ax=ax_mp)
     fig_mp.savefig(os.path.join(baseline_working_directory, "Output", "ICML18_ExtraFigure_Nile_ModelPosterior.pdf"),
                    format="pdf", dpi=800)
+    if os.path.isfile(os.path.join(baseline_working_directory, "Output", "ICML18_ExtraFigure_Nile_ModelPosterior.pdf")):
+        print("Extra plot of the model posterior can be found in the Output directory")
