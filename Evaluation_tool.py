@@ -59,18 +59,22 @@ class EvaluationTool:
         arguments), or you give it the path to data that has been stored from
         a previous experiment"""
         self.type = None
-        self.has_true_CPs = False
-        self.names = ["names", "execution time", "S1", "S2", "T", 
-                 "trimmer threshold", "MAP CPs", "model labels",
-                     "run length log distribution", 
-                     "model and run length log distribution", 
-                     "one-step-ahead predicted mean",
-                     "one-step-ahead predicted variance",
-                     "all run length log distributions",
-                     "all model and run length log distributions",
-                     "all retained run lenghts",
-                     "has true CPs",  "true CP locations", 
-                     "true CP model index", "true CP model labels"]
+        self.names = ["names", "execution time", "S1", "S2", "T",
+                      "trimmer threshold", "MAP CPs", "model labels",
+                      "run length log distribution",
+                      "model and run length log distribution",
+                      "one-step-ahead predicted mean",
+                      "one-step-ahead predicted variance",
+                      "all run length log distributions",
+                      "all model and run length log distributions",
+                      "all retained run lengths",
+                      "has true CPs", "true CP locations",
+                      "true CP model index", "true CP model labels"]
+
+        """Initialise the list of results: empty apart from names and no true CPs"""
+        self.results = [None]*len(self.names)
+        self.results[self.names.index("names")] = self.names
+        self.results[self.names.index("has true CPs")] = False
         
         """NOTE: Plotting will work with 7 different colors and 4 different
                  line styles!"""
@@ -242,12 +246,18 @@ class EvaluationTool:
         CP location. *true_CP_model_label* gives you the string label of the
         true DGP starting at the CP, e.g. 
         true_CP_model_label = ["BVAR(4,4,1)", "BVAR(1,1,1,1,1)"]."""
+
+        # Store CPs and their properties in the EvT
         self.true_CP_location = true_CP_location
         self.true_CP_model_index = true_CP_model_index
-        #if self.model_labels is None:
-        #    self.model_labels = true_CP_model_label
         self.true_CP_model_label = true_CP_model_label
         self.has_true_CPs = True
+
+        # Update the values in results
+        self.results[self.results[0].index("true CP locations")] = self.true_CP_location
+        self.results[self.results[0].index("true CP model index")] = self.true_CP_model_index
+        self.results[self.results[0].index("true CP model labels")] = self.true_CP_model_label
+        self.results[self.results[0].index("has true CPs")] = self.has_true_CPs
         
         
     """*********************************************************************
@@ -326,31 +336,23 @@ class EvaluationTool:
             else:
                 self.model_labels[i] = class_label
         
-        
         """STEP 3: Sum them all up in a results-object"""
         self.results = [self.execution_time, self.S1, self.S2, self.T, 
-                   self.threshold, self.CPs, self.model_labels,
-                       self.run_length_log_distr, 
-                       self.model_and_run_length_log_distr,
-                       self.storage_mean, self.storage_var, 
-                       self.storage_run_length_log_distr, 
-                       self.storage_model_and_run_length_log_distr, #,
-                       self.storage_all_retained_run_lengths
-                       ]
+                        self.threshold, self.CPs, self.model_labels,
+                        self.run_length_log_distr,
+                        self.model_and_run_length_log_distr,
+                        self.storage_mean, self.storage_var,
+                        self.storage_run_length_log_distr,
+                        self.storage_model_and_run_length_log_distr,
+                        self.storage_all_retained_run_lengths,
+                        self.has_true_CPs, self.true_CP_location,
+                        self.true_CP_model_index, self.true_CP_model_label]
+
         if self.detector.save_performance_indicators:
             self.names.append("MSE")
             self.names.append("NLL")
             self.results.append(self.MSE)
             self.results.append(self.negative_log_likelihood)
-        if self.has_true_CPs:
-            self.names.append("has true CP")
-            self.names.append("true CP location")
-            self.names.append("true CP model index")
-            self.names.append("true CP model label")
-            self.results.append(self.has_true_CPs)
-            self.results.append(self.true_CP_location)
-            self.results.append(self.true_CP_model_index)
-            self.results.append(self.true_CP_model_label)
             
         """append the names to the front of results"""
         self.results.insert(0, self.names)
