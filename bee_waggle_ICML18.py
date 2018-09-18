@@ -266,4 +266,4 @@ if __name__ == "__main__":
     print("upper_VAR:", upper_VAR)
     print("normalize:", normalize)
     print("coupling:", coupling)
-    print("hyperpar_opt", hyperpar_opt)
+    print("hyperpar_opt:", hyperpar_opt)
