@@ -77,12 +77,10 @@ if __name__ == "__main__":
         description="Options for applying the BOCPDMS algorithm to the bee waggle dance dataset.")
     parser.add_argument("-f", "--figures", type=bool, default=False, help="Show figures")
     parser.add_argument("-a", "--prior_a", type=float, default=1.0, help="Initial value of a")
-    parser.add_argument("-b", "--prior_b", type=float, default=1.0, help="Initial value of b")
-    parser.add_argument("-ms", "--prior_mean_scale", type=float, default=0.0,
-                        help="Mean scale used to calculate beta_0")
-    parser.add_argument("-vs", "--prior_var_scale", type=float, default=0.01,
+    parser.add_argument("-b", "--prior_b", type=float, default=0.005, help="Initial value of b")
+    parser.add_argument("-vs", "--prior_var_scale", type=float, default=0.0075,
                         help="Variance scale used to calculate V_0")
-    parser.add_argument("-i", "--intensity", type=float, default=50, help="Intensity")
+    parser.add_argument("-i", "--intensity", type=float, default=2, help="Intensity")
     parser.add_argument("-lAR", "--lower_AR", type=int, default=1, help="Lower lag length for AR models")
     parser.add_argument("-uAR", "--upper_AR", type=int, default=None, help="Upper lag length for AR models")
     parser.add_argument("-lVAR", "--lower_VAR", type=int, default=1, help="Lower lag length for VAR models")
@@ -93,7 +91,6 @@ if __name__ == "__main__":
     show_figures = args.figures
     prior_a = args.prior_a
     prior_b = args.prior_b
-    prior_mean_scale = args.prior_mean_scale
     prior_var_scale = args.prior_var_scale
     intensity = args.intensity
     lower_AR = args.lower_AR
@@ -103,6 +100,7 @@ if __name__ == "__main__":
 
     # Set the remaining options and parameter values
     normalize = True            # Normalize as Saatci et al. (2010) do (see also the code of Turner (2012))
+    prior_mean_scale = 0.0      # If we normalize, the prior on the mean should be zero
     hyperpar_opt = "caron"
     coupling = "weak coupling"
 
@@ -110,6 +108,9 @@ if __name__ == "__main__":
 
     waggle_id = 1               # Turner (2012) & Saatci et al. (2010) analyze the first of the six datasets
     data, S1, S2, T, true_CP_location, true_CP_model_index = load_bee_data(data_directory, waggle_id, normalize)
+
+    # Generate last required parameter for models
+    intercept_priors = np.mean(data, axis=0)
 
     """STEP 3: We need to set up the potential neighbourhoods. It is reasonable to work with three models:
     pure-AR, all-VAR, and AR for the angle but VAR for the coord. The idea is to further down multiply the
@@ -139,8 +140,8 @@ if __name__ == "__main__":
     cp_model = CpModel(intensity)
 
     # If upper_AR and upper_VAR are not already set from the command line arguments, get the span of reasonable lags
-    # given T (here, L = 0.85 * (T/log(T))^{1/4} for AR, and ^{1/6} for VAR)
-    mult = 0.85
+    # given T (here, L = O(T/log(T))^{1/4} for AR, and O(T/log(T))^{1/6} for VAR)
+    mult = 1
     if upper_AR is None:
         upper_AR = int(mult * pow(float(T) / np.log(T), 0.25) + 1)
     if upper_VAR is None:
@@ -159,6 +160,8 @@ if __name__ == "__main__":
             general_nbh_restriction_sequence=AR_res_elem * lag,
             general_nbh_coupling=coupling,
             hyperparameter_optimization=hyperpar_opt)]
+        # Mean of each spatial dimension isn't exactly zero after normalisation, so take that into account
+        AR_models[lag - lower_AR].prior_mean_beta = np.append(intercept_priors, [0]*S1*S2*lag)
 
     # Create all VAR models
     VAR_models = []
