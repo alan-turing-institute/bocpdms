@@ -9,6 +9,7 @@ Description: Reads in the nile data and processes it as a demo
 """
 
 # System packages/modules
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
@@ -62,37 +63,55 @@ if __name__ == "__main__":
 
     """STEP 2: Set up initial hyperparameters (will be optimized throughout 
     the algorithm) and lag lengths"""
-    intensity = 100
-    cp_model = CpModel(intensity)                   # A constant hazard function
-    a, b = 1, 1                                     # Inverse Gamma hyperparameters; will be optimized inside code
-    prior_mean_scale, prior_var_scale = 0, 0.075    # Normal hyperparameters
 
-    """STEP 3: Decide the minimum and maximum lag length of your AR models. In 
-    the paper, we suggest int(mult*pow(float(T)/np.log(T), 0.25) + 1) for mult = 1
-    as the maximum lag length, and 1 for the minimum lag length, but the algorithm
-    is relatively insensitive to choosing different pairs"""
-    upper_AR = 3
-    lower_AR = 1
+    #  Set up the parser
+    parser = argparse.ArgumentParser(
+        description="Options for applying the BOCPDMS algorithm to the bee waggle dance dataset.")
+    parser.add_argument("-a", "--prior_a", type=float, default=1.0, help="Initial value of a")
+    parser.add_argument("-b", "--prior_b", type=float, default=1.0, help="Initial value of b")
+    parser.add_argument("-ms", "--prior_mean_scale", type=float, default=0.0,
+                        help="Mean scale used to calculate beta_0")
+    parser.add_argument("-vs", "--prior_var_scale", type=float, default=0.0075,
+                        help="Variance scale used to calculate V_0")
+    parser.add_argument("-i", "--intensity", type=float, default=100, help="Intensity")
+    parser.add_argument("-lAR", "--lower_AR", type=int, default=1, help="Lower lag length for AR models")
+    parser.add_argument("-uAR", "--upper_AR", type=int, default=3, help="Upper lag length for AR models")
 
-    """STEP 4: Set up the AR-models, run algorithm"""
+    args = parser.parse_args()
+    prior_a = args.prior_a          # a, b: inverse Gamma hyperparameters; will be optimized inside detector
+    prior_b = args.prior_b
+    prior_mean_scale = args.prior_mean_scale
+    prior_var_scale = args.prior_var_scale
+    intensity = args.intensity
+    lower_AR = args.lower_AR        # In the paper, we suggest int(mult*pow(float(T)/np.log(T), 0.25) + 1) for mult = 1
+    upper_AR = args.upper_AR        # as the maximum lag length, and 1 for the minimum lag length, but the algorithm is
+                                    # relatively insensitive to choosing different pairs
+
+    # Changepoint prior is a constant hazard function
+    cp_model = CpModel(intensity)
+
+    # And optimise the hyperparameters online
+    hyperpar_opt = "online"
+
+    """STEP 3: Set up the AR-models, run algorithm"""
     AR_models = []
     for lag in range(lower_AR, upper_AR + 1):
         """Generate next model object"""
         AR_models += [BVARNIG(
-            prior_a=a, prior_b=b,
+            prior_a=prior_a, prior_b=prior_b,
             S1=S1, S2=S2,
             prior_mean_scale=prior_mean_scale,
             prior_var_scale=prior_var_scale,
             intercept_grouping=None,
             nbh_sequence=[0] * lag,
             restriction_sequence=[0] * lag,
-            hyperparameter_optimization="online")]
+            hyperparameter_optimization=hyperpar_opt)]
 
-    """STEP 5: Put all model objects together, create model universe, model priors"""
+    """STEP 4: Put all model objects together, create model universe, model priors"""
     model_universe = np.array(AR_models)
     model_prior = np.array([1 / len(model_universe)] * len(model_universe))
 
-    """STEP 6: Build and run detector, i.e. the object responsible for executing 
+    """STEP 5: Build and run detector, i.e. the object responsible for executing 
     BOCPDMS with multiple (previously specified) models for the segments and a 
     CP model specified by cp_model"""
     detector = Detector(
@@ -114,12 +133,12 @@ if __name__ == "__main__":
         loss_param_learning="squared_loss")
     detector.run()
 
-    """STEP 7: Store results into EvaluationTool object with plotting capability"""
+    """STEP 6: Store results into EvaluationTool object with plotting capability"""
     EvT = EvaluationTool()
     EvT.build_EvaluationTool_via_run_detector(detector)
     EvT.store_results_to_HD(os.path.join(baseline_working_directory, "Output", "results_nile.txt"))
 
-    """STEP 8: Inspect convergence of the hyperparameters"""
+    """STEP 7: Inspect convergence of the hyperparameters"""
     for lag in range(0, upper_AR + 1 - lower_AR):
         plt.plot(np.linspace(1, len(detector.model_universe[lag].a_list),
                              len(detector.model_universe[lag].a_list)),
@@ -133,7 +152,7 @@ if __name__ == "__main__":
                     format="pdf", dpi=800)
         plt.cla()
 
-    """STEP 9: Also plot some performance indicators (will usually be printed 
+    """STEP 8: Also plot some performance indicators (will usually be printed 
     to the console before the plots)"""
     print("\nCPs are ", detector.CPs[-2])
     print("\n***** Predictive MSE + NLL from Table 1 in ICML 2018 paper *****")
@@ -141,3 +160,15 @@ if __name__ == "__main__":
           (np.mean(detector.MSE), 1.96 * scipy.stats.sem(detector.MSE)))
     print("NLL is %.5g with 95%% error of %.5g" %
           (np.mean(detector.negative_log_likelihood), 1.96 * scipy.stats.sem(detector.negative_log_likelihood)))
+
+    """STEP 9: Print out the settings used to get these results"""
+    print("\n")
+    print("***** Parameter values and other options *****")
+    print("prior_a:", prior_a)
+    print("prior_b:", prior_b)
+    print("prior_mean_scale:", prior_mean_scale)
+    print("prior_var_scale:", prior_var_scale)
+    print("intensity:", intensity)
+    print("lower_AR:", lower_AR)
+    print("upper_AR:", upper_AR)
+    print("hyperpar_opt:", hyperpar_opt)
