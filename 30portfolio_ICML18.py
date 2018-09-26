@@ -91,7 +91,6 @@ def read_nbhs(data_dir, mode):
 if __name__ == "__main__":
 
     show_figures = False
-    run_detectors = True
     normalize = False
     shortened, shortened_T = False, 350     # if true, only run the first shortened_T observations
 
@@ -287,7 +286,6 @@ if __name__ == "__main__":
 
     """STEP 6: Pure AR nbhs/no nbhs"""
     mult = 1
-    intensity = 100
     upper_AR = int(mult*pow(float(T)/np.log(T), 0.25) + 1)
     lower_AR = 1
     upper_VAR = int(mult*pow(float(T)/np.log(T), 1.0/6.0) + 1)
@@ -308,12 +306,12 @@ if __name__ == "__main__":
         data = data[:T,:]
 
     """STEP 8: Set priors"""
-    intensity_list = [1000]
-    a_prior_list = [100]
-    b_prior_list = [0.001]
-    var_scale_list =[0.001]
+    intensity = 1000
+    prior_a = 100
+    prior_b = 0.001
+    prior_var_scale = 0.001
     prior_mean_scale = 0.0
-    hyperpar_opt = "caron" # ensures on-line hyperparameter optimization
+    hyperpar_opt = "caron"  # Ensures on-line hyperparameter optimization
 
     AR_selections = [1,5]
     sic_nbhs_res_seq_list = [
@@ -353,199 +351,193 @@ if __name__ == "__main__":
 
     """STEP 10: Run detectors"""
 
-    if run_detectors:
-        for intensity in intensity_list:
-            for var_scale in var_scale_list:
-                for a in a_prior_list:
-                    for b in b_prior_list:
-                        cp_model = CpModel(intensity)
+    cp_model = CpModel(intensity)
 
-                        """Create models"""
-                        all_models = []
+    """Create models"""
+    all_models = []
 
-                        """STEP 10.2: build AR models"""
-                        if AR_nbhs:
-                            AR_models = []
-                            for lag in AR_selections:
-                                AR_models += [BVARNIG(
-                                    prior_a=a, prior_b=b,
-                                    S1=S1, S2=S2,
-                                    prior_mean_scale=prior_mean_scale,
-                                    prior_var_scale=var_scale,
-                                    intercept_grouping=grouping,
-                                    general_nbh_sequence=np.array([[[]] * lag] * S2 * S2),
-                                    general_nbh_restriction_sequence=np.array([[[0]] * lag] * S2 * S2),
-                                    general_nbh_coupling="weak coupling",
-                                    hyperparameter_optimization=hyperpar_opt)]
-                            all_models = all_models + AR_models
+    """STEP 10.2: build AR models"""
+    if AR_nbhs:
+        AR_models = []
+        for lag in AR_selections:
+            AR_models += [BVARNIG(
+                prior_a=prior_a, prior_b=prior_b,
+                S1=S1, S2=S2,
+                prior_mean_scale=prior_mean_scale,
+                prior_var_scale=prior_var_scale,
+                intercept_grouping=grouping,
+                general_nbh_sequence=np.array([[[]] * lag] * S2 * S2),
+                general_nbh_restriction_sequence=np.array([[[0]] * lag] * S2 * S2),
+                general_nbh_coupling="weak coupling",
+                hyperparameter_optimization=hyperpar_opt)]
+        all_models = all_models + AR_models
 
-                        """STEP 10.3: build model universe entries with weak coupling"""
-                        if build_weak_coupling:
-                            VAR_models_weak = []
-                            if build_sic_nbhs:
-                                """Build nbhs based on SIC-induced nbhs"""
-                                for res in sic_nbhs_res_seq_list:
-                                    VAR_models_weak += [BVARNIG(
-                                        prior_a=a, prior_b=b,
-                                        S1=S1, S2=S2,
-                                        prior_mean_scale=prior_mean_scale,
-                                        prior_var_scale=var_scale,
-                                        intercept_grouping=grouping,
-                                        general_nbh_sequence=nbhs_SIC,
-                                        general_nbh_restriction_sequence=res,
-                                        general_nbh_coupling="weak coupling",
-                                        hyperparameter_optimization=hyperpar_opt)]
-                            if build_cor_nbhs:
-                                """Build nbhs based on contemporaneous corr"""
-                                for nbhs in contemp_nbhs_interest:
-                                    for res in contemp_nbhs_res_seq_list:
-                                        VAR_models_weak += [BVARNIG(
-                                            prior_a=a, prior_b=b,
-                                            S1=S1, S2=S2,
-                                            prior_mean_scale=prior_mean_scale,
-                                            prior_var_scale=var_scale,
-                                            intercept_grouping=grouping,
-                                            general_nbh_sequence=nbhs,
-                                            general_nbh_restriction_sequence=res,
-                                            general_nbh_coupling="weak coupling",
-                                            hyperparameter_optimization=hyperpar_opt)]
+    """STEP 10.3: build model universe entries with weak coupling"""
+    if build_weak_coupling:
+        VAR_models_weak = []
+        if build_sic_nbhs:
+            """Build nbhs based on SIC-induced nbhs"""
+            for res in sic_nbhs_res_seq_list:
+                VAR_models_weak += [BVARNIG(
+                    prior_a=prior_a, prior_b=prior_b,
+                    S1=S1, S2=S2,
+                    prior_mean_scale=prior_mean_scale,
+                    prior_var_scale=prior_var_scale,
+                    intercept_grouping=grouping,
+                    general_nbh_sequence=nbhs_SIC,
+                    general_nbh_restriction_sequence=res,
+                    general_nbh_coupling="weak coupling",
+                    hyperparameter_optimization=hyperpar_opt)]
+        if build_cor_nbhs:
+            """Build nbhs based on contemporaneous corr"""
+            for nbhs in contemp_nbhs_interest:
+                for res in contemp_nbhs_res_seq_list:
+                    VAR_models_weak += [BVARNIG(
+                        prior_a=prior_a, prior_b=prior_b,
+                        S1=S1, S2=S2,
+                        prior_mean_scale=prior_mean_scale,
+                        prior_var_scale=prior_var_scale,
+                        intercept_grouping=grouping,
+                        general_nbh_sequence=nbhs,
+                        general_nbh_restriction_sequence=res,
+                        general_nbh_coupling="weak coupling",
+                        hyperparameter_optimization=hyperpar_opt)]
 
-                            if build_autocorr_nbhs:
-                                """Build nbhs based on autocorr"""
-                                for nbhs in autocorr_nbhs_interest:
-                                    for res in autocorr_nbhs_res_seq_list:
-                                        VAR_models_weak += [BVARNIG(
-                                            prior_a=a, prior_b=b,
-                                            S1=S1, S2=S2,
-                                            prior_mean_scale=prior_mean_scale,
-                                            prior_var_scale=var_scale,
-                                            intercept_grouping=grouping,
-                                            general_nbh_sequence=nbhs,
-                                            general_nbh_restriction_sequence=res,
-                                            general_nbh_coupling="weak coupling",
-                                            hyperparameter_optimization=hyperpar_opt)]
+        if build_autocorr_nbhs:
+            """Build nbhs based on autocorr"""
+            for nbhs in autocorr_nbhs_interest:
+                for res in autocorr_nbhs_res_seq_list:
+                    VAR_models_weak += [BVARNIG(
+                        prior_a=prior_a, prior_b=prior_b,
+                        S1=S1, S2=S2,
+                        prior_mean_scale=prior_mean_scale,
+                        prior_var_scale=prior_var_scale,
+                        intercept_grouping=grouping,
+                        general_nbh_sequence=nbhs,
+                        general_nbh_restriction_sequence=res,
+                        general_nbh_coupling="weak coupling",
+                        hyperparameter_optimization=hyperpar_opt)]
 
-                            all_models = all_models + VAR_models_weak
+        all_models = all_models + VAR_models_weak
 
-                        """STEP 10.4: build model universe entries with strong coupling"""
-                        if build_strong_coupling:
-                            VAR_models_strong = []
-                            if build_sic_nbhs:
-                                """Build nbhs based on SIC-induced nbhs"""
-                                for res in sic_nbhs_res_seq_list:
-                                    VAR_models_strong += [BVARNIG(
-                                        prior_a=a, prior_b=b,
-                                        S1=S1, S2=S2,
-                                        prior_mean_scale=prior_mean_scale,
-                                        prior_var_scale=var_scale,
-                                        intercept_grouping=grouping,
-                                        general_nbh_sequence=nbhs_SIC,
-                                        general_nbh_restriction_sequence=res,
-                                        general_nbh_coupling="strong coupling",
-                                        hyperparameter_optimization=hyperpar_opt)]
-                            if build_cor_nbhs:
-                                """Build nbhs based on contemporaneous corr"""
-                                for nbhs in contemp_nbhs_interest:
-                                    for res in contemp_nbhs_res_seq_list:
-                                        VAR_models_strong += [BVARNIG(
-                                            prior_a=a, prior_b=b,
-                                            S1=S1, S2=S2,
-                                            prior_mean_scale=prior_mean_scale,
-                                            prior_var_scale=var_scale,
-                                            intercept_grouping=grouping,
-                                            general_nbh_sequence=nbhs,
-                                            general_nbh_restriction_sequence=res,
-                                            general_nbh_coupling="strong coupling",
-                                            hyperparameter_optimization=hyperpar_opt)]
+    """STEP 10.4: build model universe entries with strong coupling"""
+    if build_strong_coupling:
+        VAR_models_strong = []
+        if build_sic_nbhs:
+            """Build nbhs based on SIC-induced nbhs"""
+            for res in sic_nbhs_res_seq_list:
+                VAR_models_strong += [BVARNIG(
+                    prior_a=prior_a, prior_b=prior_b,
+                    S1=S1, S2=S2,
+                    prior_mean_scale=prior_mean_scale,
+                    prior_var_scale=prior_var_scale,
+                    intercept_grouping=grouping,
+                    general_nbh_sequence=nbhs_SIC,
+                    general_nbh_restriction_sequence=res,
+                    general_nbh_coupling="strong coupling",
+                    hyperparameter_optimization=hyperpar_opt)]
+        if build_cor_nbhs:
+            """Build nbhs based on contemporaneous corr"""
+            for nbhs in contemp_nbhs_interest:
+                for res in contemp_nbhs_res_seq_list:
+                    VAR_models_strong += [BVARNIG(
+                        prior_a=prior_a, prior_b=prior_b,
+                        S1=S1, S2=S2,
+                        prior_mean_scale=prior_mean_scale,
+                        prior_var_scale=prior_var_scale,
+                        intercept_grouping=grouping,
+                        general_nbh_sequence=nbhs,
+                        general_nbh_restriction_sequence=res,
+                        general_nbh_coupling="strong coupling",
+                        hyperparameter_optimization=hyperpar_opt)]
 
-                            if build_autocorr_nbhs:
-                                """Build nbhs based on autocorr"""
-                                for nbhs in autocorr_nbhs_interest:
-                                    for res in autocorr_nbhs_res_seq_list:
-                                        VAR_models_strong += [BVARNIG(
-                                            prior_a=a, prior_b=b,
-                                            S1=S1, S2=S2,
-                                            prior_mean_scale=prior_mean_scale,
-                                            prior_var_scale=var_scale,
-                                            intercept_grouping=grouping,
-                                            general_nbh_sequence=nbhs,
-                                            general_nbh_restriction_sequence=res,
-                                            general_nbh_coupling="strong coupling",
-                                            hyperparameter_optimization=hyperpar_opt)]
+        if build_autocorr_nbhs:
+            """Build nbhs based on autocorr"""
+            for nbhs in autocorr_nbhs_interest:
+                for res in autocorr_nbhs_res_seq_list:
+                    VAR_models_strong += [BVARNIG(
+                        prior_a=prior_a, prior_b=prior_b,
+                        S1=S1, S2=S2,
+                        prior_mean_scale=prior_mean_scale,
+                        prior_var_scale=prior_var_scale,
+                        intercept_grouping=grouping,
+                        general_nbh_sequence=nbhs,
+                        general_nbh_restriction_sequence=res,
+                        general_nbh_coupling="strong coupling",
+                        hyperparameter_optimization=hyperpar_opt)]
 
-                            all_models = all_models + VAR_models_strong
+        all_models = all_models + VAR_models_strong
 
-                        model_universe = np.array(all_models)
-                        model_prior = np.array([1 / len(model_universe)] * len(model_universe))
+    model_universe = np.array(all_models)
+    model_prior = np.array([1 / len(model_universe)] * len(model_universe))
 
-                        """Build and run detector"""
-                        detector = Detector(data=data, model_universe=model_universe,
-                                            model_prior=model_prior,
-                                            cp_model=cp_model, S1=S1, S2=S2, T=T,
-                                            store_rl=True, store_mrl=True,
-                                            trim_type="keep_K", threshold=100,
-                                            notifications=100,
-                                            save_performance_indicators=True,
-                                            training_period=test_obs)
-                        detector.run()
+    """Build and run detector"""
+    detector = Detector(data=data, model_universe=model_universe,
+                        model_prior=model_prior,
+                        cp_model=cp_model, S1=S1, S2=S2, T=T,
+                        store_rl=True, store_mrl=True,
+                        trim_type="keep_K", threshold=100,
+                        notifications=100,
+                        save_performance_indicators=True,
+                        training_period=test_obs)
+    detector.run()
 
-                        """Store results + real CPs into EvaluationTool obj"""
-                        EvT = EvaluationTool()
-                        EvT.build_EvaluationTool_via_run_detector(detector)
+    """Store results + real CPs into EvaluationTool obj"""
+    EvT = EvaluationTool()
+    EvT.build_EvaluationTool_via_run_detector(detector)
 
-                        """Store that EvT object onto hard drive"""
-                        detector_path = os.path.join(results_directory, "time_frame=" + time_frame,
-                                                     "transform=" + str(heavy_tails_transform),
-                                                     "a=" + str(a), "b=" + str(b))
+    """Store that EvT object onto hard drive"""
+    detector_path = os.path.join(results_directory, time_frame + "_htt" + str(heavy_tails_transform) +
+                                 "_a" + str(prior_a) + "_b" + str(prior_b) + "_i" + str(intensity))
 
-                        if not os.path.exists(detector_path):
-                            os.makedirs(detector_path)
+    if not os.path.exists(detector_path):
+        os.makedirs(detector_path)
 
-                        if shortened:
-                            EvT.store_results_to_HD(os.path.join(detector_path,
-                                                                 "results_30portfolios_short" + str(shortened_T) + ".txt"))
-                        else:
-                            EvT.store_results_to_HD(os.path.join(detector_path, "results_30portfolios.txt"))
+    if shortened:
+        EvT.store_results_to_HD(os.path.join(detector_path,
+                                             "results_30portfolios_short" + str(shortened_T) + ".txt"))
+    else:
+        EvT.store_results_to_HD(os.path.join(detector_path, "results_30portfolios.txt"))
 
-                        if show_figures:
+    if show_figures:
 
-                            fig_p, ax_p = plt.subplots()
-                            EvT.plot_predictions(indices=[0],
-                                                 print_plt=True,
-                                                 legend=False,
-                                                 legend_labels=None,
-                                                 legend_position=None,
-                                                 time_range=None,
-                                                 show_var=False,
-                                                 show_CPs=True,
-                                                 ax=ax_p)
-                            plt.close(fig_p)
+        fig_p, ax_p = plt.subplots()
+        EvT.plot_predictions(indices=[0],
+                             print_plt=True,
+                             legend=False,
+                             legend_labels=None,
+                             legend_position=None,
+                             time_range=None,
+                             show_var=False,
+                             show_CPs=True,
+                             ax=ax_p)
+        plt.close(fig_p)
 
-                            fig_rld, ax_rld = plt.subplots()
-                            EvT.plot_run_length_distr(print_plt=True,
-                                                      show_MAP_CPs=True,
-                                                      show_real_CPs=False,
-                                                      mark_median=False,
-                                                      log_format=True,
-                                                      CP_legend=False,
-                                                      buffer=50,
-                                                      ax=ax_rld)
-                            plt.close(fig_rld)
+        fig_rld, ax_rld = plt.subplots()
+        EvT.plot_run_length_distr(print_plt=True,
+                                  show_MAP_CPs=True,
+                                  show_real_CPs=False,
+                                  mark_median=False,
+                                  log_format=True,
+                                  CP_legend=False,
+                                  buffer=50,
+                                  ax=ax_rld)
+        plt.close(fig_rld)
 
-                            plt.plot(np.linspace(1, len(detector.model_universe[0].a_list),
-                                                 len(detector.model_universe[0].a_list)),
-                                     np.array(detector.model_universe[0].a_list))
-                            plt.plot(np.linspace(1, len(detector.model_universe[0].b_list),
-                                                 len(detector.model_universe[0].b_list)),
-                                     np.array(detector.model_universe[0].b_list))
+        plt.plot(np.linspace(1, len(detector.model_universe[0].a_list),
+                             len(detector.model_universe[0].a_list)),
+                 np.array(detector.model_universe[0].a_list))
+        plt.plot(np.linspace(1, len(detector.model_universe[0].b_list),
+                             len(detector.model_universe[0].b_list)),
+                 np.array(detector.model_universe[0].b_list))
 
-                        print("MSE", np.sum(np.mean(detector.MSE, axis=0)),
-                              np.sum(scipy.stats.sem(detector.MSE, axis=0)))
-                        print("NLL", np.mean(detector.negative_log_likelihood),
-                              np.sum(scipy.stats.sem(detector.negative_log_likelihood, axis=0)))
-                        print("a", a)
-                        print("b", b)
-                        print("intensity", intensity)
-                        print("beta var prior", var_scale)
-                        print("MAP CPs at times", [1996.91 + e[0] / 252 for e in detector.CPs[-2]])
-                        print("MAP models", [e[1] for e in detector.CPs[-2]])
+    print("MSE", np.sum(np.mean(detector.MSE, axis=0)),
+          np.sum(scipy.stats.sem(detector.MSE, axis=0)))
+    print("NLL", np.mean(detector.negative_log_likelihood),
+          np.sum(scipy.stats.sem(detector.negative_log_likelihood, axis=0)))
+    print("a", prior_a)
+    print("b", prior_b)
+    print("intensity", intensity)
+    print("beta var prior", prior_var_scale)
+    print("MAP CPs at times", [1996.91 + e[0] / 252 for e in detector.CPs[-2]])
+    print("MAP models", [e[1] for e in detector.CPs[-2]])
