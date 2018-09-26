@@ -20,6 +20,44 @@ from Evaluation_tool import EvaluationTool
 from cp_probability_model import CpModel
 
 
+def load_portfolios_data(path_to_data, data_file, dates_file):
+
+    """STEP 1: Read in data and dates"""
+    mylist = []
+    count = 0
+    with open(os.path.join(path_to_data, data_file)) as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            #DEBUG: Unclear if this is needed
+            if count > 0:
+                mylist += row
+            count += 1
+
+    """transform into floats and bring into numpy format"""
+    mylist2 = []
+    for entry in mylist:
+        mylist2 += [float(entry)]
+    data = np.array([mylist2]).reshape(int(len(mylist2)/30), 30)
+    S1,S2,T = 30,1,data.shape[0]
+
+    """Read in the dates"""
+    myl = []
+    count = 0
+    with open(os.path.join(path_to_data, dates_file)) as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            #DEBUG: Unclear if this is needed
+            if count > 0:
+                myl += row
+            count += 1
+
+    dates = []
+    for e in myl:
+        dates.append(int(e))
+
+    return data, dates, S1, S2, T
+
+
 def read_nbhs(data_dir, mode):
     """STEP 1: Read in the cutoffs"""
     cutoffs_file = os.path.join(data_dir, mode, "portfolio_grouping_cutoffs.csv")
@@ -85,143 +123,10 @@ def read_nbhs(data_dir, mode):
         nbh_indices_all_decades.append(nbh_indices.copy())
 
     """STEP 5: Lastly, just return the results of our analysis"""
-    return ([num_decades, num_nbhs, nbh_indices_all_decades])
+    return num_decades, num_nbhs, nbh_indices_all_decades
 
 
-if __name__ == "__main__":
-
-    show_figures = False
-    normalize = False
-    shortened, shortened_T = False, 350     # if true, only run the first shortened_T observations
-
-    """folder containing dates and data (with result folders being created at 
-    run-time if necessary)"""
-    baseline_working_directory = os.getcwd()
-    data_directory = os.path.join(baseline_working_directory, "Data", "30PF")
-    results_directory = os.path.join(baseline_working_directory, "Output", "30PF")
-
-    """dates, e.g. 25/12/1992 is 19921225, corresponding to the observations"""
-    file_name_dates = os.path.join(data_directory, "portfolio_dates.csv")
-
-    """30 Portfolio data. In same order as original data set"""
-    file_name_data = os.path.join(data_directory, "portfolio_data.csv")
-
-    """prototype of the portfolio grouping names that give the list of nbhs 
-    for each location, i.e. give the list of nbhs for each Portfolio."""
-    file_name_nbhs_proto = os.path.join(data_directory, "portfolio_grouping_")
-
-    """Modes when running the code"""
-    build_weak_coupling = True
-    build_strong_coupling = False   # i.e., each Portfolio has its own parameters
-    build_sic_nbhs = True           # i.e., include neighbourhood system built on SIC codes
-    build_cor_nbhs = True           # i.e., include NBHS built on contemporaneous correlation
-    build_autocorr_nbhs = True      # i.e., include NBHS built on autocorrelation
-    decades_of_interest = [-1]      # give index of decades whose structure you deem relevant relative to the last 3
-    AR_nbhs = True
-    heavy_tails_transform = True    # use normal(t(y)) transform as in Turner, Saatci, and al.
-    time_frame = "comparison"       # "comparison",last_20", last_10;
-                                    # "comparison" looks at 03/07/1975 -- 31/12/2008,
-                                    # "last_20" looks at last 20 years before 31/01/2018
-                                    # neighbourhoods will be different depending on the mode
-
-    """*********************************************************************
-        
-            Read in the nbhs for real and work with them
-        
-    *********************************************************************"""
-
-    """STEP 1: Read in data and dates"""
-    mylist = []
-    count = 0
-    with open(file_name_data) as csvfile:
-        reader = csv.reader(csvfile)
-        for row in reader:
-            #DEBUG: Unclear if this is needed
-            if count > 0:
-                mylist += row
-            count += 1
-            if count % 2500 == 0:
-                print(count)
-
-    """transform into floats and bring into numpy format"""
-    mylist2 = []
-    for entry in mylist:
-        mylist2 += [float(entry)]
-    data = np.array([mylist2]).reshape(int(len(mylist2)/30), 30)
-    S1,S2,T = 30,1,data.shape[0]
-
-    """Read in the dates"""
-    myl = []
-    count = 0
-    with open(file_name_dates) as csvfile:
-        reader = csv.reader(csvfile)
-        for row in reader:
-            #DEBUG: Unclear if this is needed
-            if count > 0:
-                myl += row
-            count += 1
-            if count % 2500 == 0:
-                print(count)
-    dates = []
-    for e in myl:
-        dates.append(int(e))
-
-    """STEP 2: get the grouping for intercepts"""
-    grouping = np.zeros((S1*S2, S1*S2))
-    for i in range(0, S1*S2):
-        grouping[i,i]=1
-    grouping = grouping.reshape((S1*S2, S1,S2))
-
-    """STEP 4: Read in the autocorr/corr nbhs"""
-
-    """STEP 4.1: Raw nbhs for all decades read in"""
-    mode1 = "contemporaneous"
-    mode2 = "autocorr"
-    num_decades_contemp, num_nbhs_contemp, contemp_nbhs = (
-            read_nbhs(data_directory, mode1))
-    num_decades_autocorr, num_nbhs_autocorr, autocorr_nbhs = (
-            read_nbhs(data_directory, mode2))
-
-    """STEP 4.2: Depending on the mode, select decades of interest"""
-    if time_frame == "comparison":
-        decades_of_interest = [2, 3, 4]
-        """select 03/07/1975 -- 31/12/2008, i.e. find indices that correspond"""
-        start_test = dates.index(19740703)  # As in Saatci et al., we use the first year without calculating MSE, NLL,
-        start_algo = dates.index(19750703)  # i.e. we have a 'test set'
-        stop = dates.index(20081231)
-        selection = np.linspace(start_test, stop, stop - start_test, dtype=int)
-        test_obs = start_algo - start_test
-    elif time_frame == "last_20":
-        decades_of_interest = [4, 5, 6]
-        """select last 20 years"""
-        years_analyzed = 21
-        num_trading_days = 252
-        """select the range of dates and data corr. to the last 20 years + 1 year
-        training"""
-        selection = np.linspace(len(dates) - 1 * num_trading_days * years_analyzed,
-                                len(dates) - 1,
-                                num_trading_days * years_analyzed, dtype=int)
-        test_obs = 252
-    elif time_frame == "last_10":
-        decades_of_interest = [5, 6, 7]
-        """select last 10 years"""
-        years_analyzed = 11
-        num_trading_days = 252
-        """select the range of dates and data corr. to the last 10 years + 1 year
-        training"""
-        selection = np.linspace(len(dates) - 1 * num_trading_days * years_analyzed,
-                                len(dates) - 1,
-                                num_trading_days * years_analyzed, dtype=int)
-        test_obs = 252
-
-    """STEP 4.3: Select decades of interest"""
-    contemp_nbhs_interest = []
-    autocorr_nbhs_interest = []
-    for decade_index in decades_of_interest:
-        """at each index of contemp_nbhs_interest, we get a nbh structure"""
-        contemp_nbhs_interest.append(contemp_nbhs[decade_index])
-        autocorr_nbhs_interest.append(autocorr_nbhs[decade_index])
-
+def get_neighbourhoods_sic():
     """STEP 5: SIC nbhs"""
 
     """STEP 5.1: Which industries belong to which SIC code? 
@@ -283,6 +188,95 @@ if __name__ == "__main__":
                 ind2 = group.copy()
                 ind2.remove(entry)
                 nbhs_SIC[entry] = [ind2]
+
+    return nbhs_SIC
+
+
+if __name__ == "__main__":
+
+    show_figures = False
+    normalize = False
+    shortened, shortened_T = False, 350     # if true, only run the first shortened_T observations
+
+    """folder containing dates and data (with result folders being created at 
+    run-time if necessary)"""
+    baseline_working_directory = os.getcwd()
+    data_directory = os.path.join(baseline_working_directory, "Data", "30PF")
+    results_directory = os.path.join(baseline_working_directory, "Output", "30PF")
+
+    """dates, e.g. 25/12/1992 is 19921225, corresponding to the observations"""
+    file_name_dates = "portfolio_dates.csv"
+
+    """30 Portfolio data. In same order as original data set"""
+    file_name_data = "portfolio_data.csv"
+
+    """prototype of the portfolio grouping names that give the list of nbhs 
+    for each location, i.e. give the list of nbhs for each Portfolio."""
+    file_name_nbhs_proto = os.path.join(data_directory, "portfolio_grouping_")
+
+    """Modes when running the code"""
+    build_weak_coupling = True
+    build_strong_coupling = False   # i.e., each Portfolio has its own parameters
+    build_sic_nbhs = True           # i.e., include neighbourhood system built on SIC codes
+    build_cor_nbhs = True           # i.e., include NBHS built on contemporaneous correlation
+    build_autocorr_nbhs = True      # i.e., include NBHS built on autocorrelation
+    decades_of_interest = [-1]      # give index of decades whose structure you deem relevant relative to the last 3
+    AR_nbhs = True
+    heavy_tails_transform = True    # use normal(t(y)) transform as in Turner, Saatci, and al.
+    time_frame = "comparison"       # "comparison",last_20", last_10;
+                                    # "comparison" looks at 03/07/1975 -- 31/12/2008,
+                                    # "last_20" looks at last 20 years before 31/01/2018
+                                    # neighbourhoods will be different depending on the mode
+
+    """*********************************************************************
+        
+            Read in the nbhs for real and work with them
+        
+    *********************************************************************"""
+
+    data, dates, S1, S2, T = load_portfolios_data(data_directory, file_name_data, file_name_dates)
+
+    """STEP 2: get the grouping for intercepts"""
+    grouping = np.zeros((S1*S2, S1*S2))
+    for i in range(0, S1*S2):
+        grouping[i,i]=1
+    grouping = grouping.reshape((S1*S2, S1,S2))
+
+    """STEP 4: Read in the autocorr/corr nbhs, and those from the SIC codes"""
+    __, __, nbhs_contemp = read_nbhs(data_directory, "contemporaneous")
+    __, __, nbhs_autocorr = read_nbhs(data_directory, "autocorr")
+    nbhs_SIC = get_neighbourhoods_sic()
+
+    """STEP 4.2: Depending on the mode, select decades of interest (adding one extra year as a test set,
+     as in Saatci et al)"""
+    num_trading_days = 252
+    if time_frame == "comparison":  # Find the indices that correspond to 03/07/1975 -- 31/12/2008
+        decades_of_interest = [2, 3, 4]
+        start_test = dates.index(19740703)
+        start_algo = dates.index(19750703)
+        stop = dates.index(20081231)
+        selection = np.linspace(start_test, stop, stop - start_test, dtype=int)
+        test_obs = start_algo - start_test
+    elif time_frame == "last_20":  # Find the indices that correspond to the last 20 years
+        decades_of_interest = [4, 5, 6]
+        years_analyzed = 21
+        selection = np.linspace(len(dates) - 1 * num_trading_days * years_analyzed, len(dates) - 1,
+                                num_trading_days * years_analyzed, dtype=int)
+        test_obs = num_trading_days
+    elif time_frame == "last_10":  # Find the indices that correspond to the last 10 years
+        decades_of_interest = [5, 6, 7]
+        years_analyzed = 11
+        selection = np.linspace(len(dates) - 1 * num_trading_days * years_analyzed, len(dates) - 1,
+                                num_trading_days * years_analyzed, dtype=int)
+        test_obs = num_trading_days
+
+    """STEP 4.3: Select decades of interest"""
+    contemp_nbhs_interest = []
+    autocorr_nbhs_interest = []
+    for decade_index in decades_of_interest:
+        """at each index of contemp_nbhs_interest, we get a nbh structure"""
+        contemp_nbhs_interest.append(nbhs_contemp[decade_index])
+        autocorr_nbhs_interest.append(nbhs_autocorr[decade_index])
 
     """STEP 6: Pure AR nbhs/no nbhs"""
     mult = 1
