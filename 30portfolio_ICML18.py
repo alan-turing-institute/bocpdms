@@ -21,14 +21,13 @@ from cp_probability_model import CpModel
 
 
 def load_portfolios_data(path_to_data, data_file, dates_file):
-
     """STEP 1: Read in data and dates"""
     mylist = []
     count = 0
     with open(os.path.join(path_to_data, data_file)) as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            #DEBUG: Unclear if this is needed
+            # DEBUG: Unclear if this is needed
             if count > 0:
                 mylist += row
             count += 1
@@ -37,8 +36,8 @@ def load_portfolios_data(path_to_data, data_file, dates_file):
     mylist2 = []
     for entry in mylist:
         mylist2 += [float(entry)]
-    data = np.array([mylist2]).reshape(int(len(mylist2)/30), 30)
-    S1,S2,T = 30,1,data.shape[0]
+    data = np.array([mylist2]).reshape(int(len(mylist2) / 30), 30)
+    T, S1, S2 = data.shape[0], data.shape[1], 1
 
     """Read in the dates"""
     myl = []
@@ -46,7 +45,7 @@ def load_portfolios_data(path_to_data, data_file, dates_file):
     with open(os.path.join(path_to_data, dates_file)) as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
-            #DEBUG: Unclear if this is needed
+            # DEBUG: Unclear if this is needed
             if count > 0:
                 myl += row
             count += 1
@@ -167,7 +166,7 @@ def get_neighbourhoods_sic():
 
     """STEP 5.2: Now, make list of length 9 with entries from 0-8 collecting 
     the portfolio indices belonging to that SIC group"""
-    SIC_indices=[]
+    SIC_indices = []
     for SIC_code in range(0,9):
         new_list = []
         count = 0
@@ -175,13 +174,13 @@ def get_neighbourhoods_sic():
             for entry in sublist:
                 if entry == SIC_code:
                     new_list.append(portfolio_index)
-            count = count+1
+            count = count + 1
         SIC_indices.append(new_list.copy())
 
     """STEP 5.3: Next, convert this into warranted form: First nbh = all with same
     SIC code. Second nbh = all that do NOT have one of your SIC codes"""
 
-    nbhs_SIC = [[[]]]*30
+    nbhs_SIC = [[[]]] * 30
     for g_index, group in enumerate(SIC_indices):
         for entry in group:
             if not group == [entry]:
@@ -228,19 +227,13 @@ if __name__ == "__main__":
                                     # "last_20" looks at last 20 years before 31/01/2018
                                     # neighbourhoods will be different depending on the mode
 
-    """*********************************************************************
-        
-            Read in the nbhs for real and work with them
-        
-    *********************************************************************"""
-
     data, dates, S1, S2, T = load_portfolios_data(data_directory, file_name_data, file_name_dates)
 
     """STEP 2: get the grouping for intercepts"""
-    grouping = np.zeros((S1*S2, S1*S2))
-    for i in range(0, S1*S2):
-        grouping[i,i]=1
-    grouping = grouping.reshape((S1*S2, S1,S2))
+    grouping = np.zeros((S1 * S2, S1 * S2))
+    for i in range(0, S1 * S2):
+        grouping[i, i] = 1
+    grouping = grouping.reshape((S1 * S2, S1, S2))
 
     """STEP 4: Read in the autocorr/corr nbhs, and those from the SIC codes"""
     __, __, nbhs_contemp = read_nbhs(data_directory, "contemporaneous")
@@ -278,26 +271,16 @@ if __name__ == "__main__":
         contemp_nbhs_interest.append(nbhs_contemp[decade_index])
         autocorr_nbhs_interest.append(nbhs_autocorr[decade_index])
 
-    """STEP 6: Pure AR nbhs/no nbhs"""
-    mult = 1
-    upper_AR = int(mult*pow(float(T)/np.log(T), 0.25) + 1)
-    lower_AR = 1
-    upper_VAR = int(mult*pow(float(T)/np.log(T), 1.0/6.0) + 1)
-    lower_VAR = 1
-
     """STEP 7: Select the time range, apply transform if needed"""
-    data = data[selection,:]
+    data = data[selection, :]
     # Do the transform as lined out in thesis of Ryan Turner if needed
     if heavy_tails_transform:
         data = scipy.stats.norm.ppf(scipy.stats.t.cdf(data, df=4))
 
-    variances = np.var(data, axis=0)
-    T, S1, S2 = data.shape[0], data.shape[1], 1
-
     """Shorten the data artificially"""
     if shortened:
-        T=shortened_T
-        data = data[:T,:]
+        T = shortened_T
+        data = data[:T, :]
 
     """STEP 8: Set priors"""
     intensity = 1000
@@ -309,39 +292,37 @@ if __name__ == "__main__":
 
     AR_selections = [1,5]
     sic_nbhs_res_seq_list = [
-            [[0],[0],[0]]
-            #[[0]]
-            ]
+        [[0], [0], [0]]
+        # [[0]]
+    ]
     contemp_nbhs_res_seq_list = [
-            [[0,1,2,3], [0,1,2], [0,1], [0]],
-            #[[0],[0],[0],[0],[0]],
-            #[[0,1], [0,1], [0,1]],
-            #[[0], [0], [0]],
-            [[0,1,2,3]],
-            #[[0,1,2]],
-            #[[0,1]]
-            #[[0]]
-            ]
+        [[0,1,2,3], [0,1,2], [0,1], [0]],
+        # [[0], [0], [0], [0], [0]],
+        # [[0,1], [0,1], [0,1]],
+        # [[0], [0], [0]],
+        [[0,1,2,3]],
+        # [[0,1,2]],
+        # [[0,1]]
+        # [[0]]
+    ]
     autocorr_nbhs_res_seq_list = [
-            [[0,1,2,3], [0,1,2], [0,1], [0]],
-            #[[0],[0],[0],[0],[0]],
-            #[[0,1], [0,1], [0,1]],
-            #[[0], [0], [0]],
-            [[0,1,2,3]],
-            #[[0,1,2]],
-            #[[0,1]]
-            #[[0]]
-            ]
+        [[0,1,2,3], [0,1,2], [0,1], [0]],
+        # [[0], [0], [0], [0], [0]],
+        # [[0,1], [0,1], [0,1]],
+        # [[0], [0], [0]],
+        [[0,1,2,3]],
+        # [[0,1,2]],
+        # [[0,1]]
+        # [[0]]
+    ]
 
-    intercept_priors = [0]*S1*S2
-
-    #REPORTED IN ICML SUBMISSION:
+    # REPORTED IN ICML SUBMISSION:
     # comparison with 3 prior decades, 2nbhs per nbh system: [[0,1,2,3], [0,1,2], [0,1], [0]], [[0,1,2,3]]
     # a=100, b=0.001, int = 1000, beta var prior = 0.001, too many CPs [first run], saved on this machine
 
     """STEP 9+: Normalize if necessary"""
     if normalize:
-        data = ((data - np.mean(data, axis=0))/np.sqrt(np.var(data,axis=0)))
+        data = ((data - np.mean(data, axis=0)) / np.sqrt(np.var(data, axis=0)))
 
     """STEP 10: Run detectors"""
 
