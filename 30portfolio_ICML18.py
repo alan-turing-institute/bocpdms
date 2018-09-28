@@ -8,11 +8,12 @@ Created on Thu Jan 11 11:09:08 2018
 Description: Process the 30-portfolio data
 """
 
+import argparse
 import numpy as np
 import os
 import csv
 import matplotlib.pyplot as plt
-import scipy
+from scipy import stats
 
 from BVAR_NIG import BVARNIG
 from detector import Detector
@@ -193,9 +194,54 @@ def get_neighbourhoods_sic():
 
 if __name__ == "__main__":
 
-    show_figures = False
+    #  Set up the parser
+    parser = argparse.ArgumentParser(
+        description="Options for applying the BOCPDMS algorithm to the bee waggle dance dataset.")
+    parser.add_argument("-f", "--figures", type=bool, default=False, help="Show figures")
+    parser.add_argument("-s", "--short", type=int, default=None,
+                        help="Only use the first s observations (recommended >=350")
+    parser.add_argument("-a", "--prior_a", type=float, default=100, help="Initial value of a")
+    parser.add_argument("-b", "--prior_b", type=float, default=0.001, help="Initial value of b")
+    parser.add_argument("-ms", "--prior_mean_scale", type=float, default=0.0,
+                        help="Mean scale used to calculate beta_0")
+    parser.add_argument("-vs", "--prior_var_scale", type=float, default=0.001,
+                        help="Variance scale used to calculate V_0")
+    parser.add_argument("-i", "--intensity", type=float, default=1000, help="Intensity")
+
+    # Get settings and parameter values from the command line arguments
+    args = parser.parse_args()
+    show_figures = args.figures
+    prior_a = args.prior_a
+    prior_b = args.prior_b
+    prior_mean_scale = args.prior_mean_scale
+    prior_var_scale = args.prior_var_scale
+    intensity = args.intensity
+
+    # If the short argument isn't set, run the algorithm on the entire dataset
+    if args.short is None:
+        shortened = False
+        shortened_T = None
+        print("Using the full dataset")
+    else:
+        shortened = True
+        shortened_T = args.short
+        print("Using the first", shortened_T, "observations")
+
+    """Modes when running the code (these shouldn't need to be changed)"""
+    AR_selections = [1, 5]
+    hyperpar_opt = "caron"          # On-line hyperparameter optimization
     normalize = False
-    shortened, shortened_T = False, 350     # if true, only run the first shortened_T observations
+    build_weak_coupling = True
+    build_strong_coupling = False   # i.e., each Portfolio has its own parameters
+    build_sic_nbhs = True           # i.e., include neighbourhood system built on SIC codes
+    build_cor_nbhs = True           # i.e., include NBHS built on contemporaneous correlation
+    build_autocorr_nbhs = True      # i.e., include NBHS built on autocorrelation
+    AR_nbhs = True
+    heavy_tails_transform = True    # Use normal(t(y)) transform as in Turner, Saatci, and al.
+    time_frame = "comparison"       # "comparison", last_20", "last_10";
+                                    # "comparison" looks at 03/07/1975 -- 31/12/2008,
+                                    # "last_20" looks at last 20 years before 31/01/2018
+                                    # neighbourhoods will be different depending on the mode
 
     """folder containing dates and data (with result folders being created at 
     run-time if necessary)"""
@@ -213,20 +259,7 @@ if __name__ == "__main__":
     for each location, i.e. give the list of nbhs for each Portfolio."""
     file_name_nbhs_proto = os.path.join(data_directory, "portfolio_grouping_")
 
-    """Modes when running the code"""
-    build_weak_coupling = True
-    build_strong_coupling = False   # i.e., each Portfolio has its own parameters
-    build_sic_nbhs = True           # i.e., include neighbourhood system built on SIC codes
-    build_cor_nbhs = True           # i.e., include NBHS built on contemporaneous correlation
-    build_autocorr_nbhs = True      # i.e., include NBHS built on autocorrelation
-    decades_of_interest = [-1]      # give index of decades whose structure you deem relevant relative to the last 3
-    AR_nbhs = True
-    heavy_tails_transform = True    # use normal(t(y)) transform as in Turner, Saatci, and al.
-    time_frame = "comparison"       # "comparison",last_20", last_10;
-                                    # "comparison" looks at 03/07/1975 -- 31/12/2008,
-                                    # "last_20" looks at last 20 years before 31/01/2018
-                                    # neighbourhoods will be different depending on the mode
-
+    """Load the dates and data for the 30 portfolios"""
     data, dates, S1, S2, T = load_portfolios_data(data_directory, file_name_data, file_name_dates)
 
     """STEP 2: get the grouping for intercepts"""
@@ -275,22 +308,16 @@ if __name__ == "__main__":
     data = data[selection, :]
     # Do the transform as lined out in thesis of Ryan Turner if needed
     if heavy_tails_transform:
-        data = scipy.stats.norm.ppf(scipy.stats.t.cdf(data, df=4))
+        data = stats.norm.ppf(stats.t.cdf(data, df=4))
 
     """Shorten the data artificially"""
     if shortened:
-        T = shortened_T
-        data = data[:T, :]
+        # T = shortened_T
+        data = data[:shortened_T, :]
 
-    """STEP 8: Set priors"""
-    intensity = 1000
-    prior_a = 100
-    prior_b = 0.001
-    prior_var_scale = 0.001
-    prior_mean_scale = 0.0
-    hyperpar_opt = "caron"  # Ensures on-line hyperparameter optimization
+    """Update T after shortening and selection"""
+    T = data.shape[0]
 
-    AR_selections = [1,5]
     sic_nbhs_res_seq_list = [
         [[0], [0], [0]]
         # [[0]]
@@ -506,13 +533,35 @@ if __name__ == "__main__":
                              len(detector.model_universe[0].b_list)),
                  np.array(detector.model_universe[0].b_list))
 
-    print("MSE", np.sum(np.mean(detector.MSE, axis=0)),
-          np.sum(scipy.stats.sem(detector.MSE, axis=0)))
-    print("NLL", np.mean(detector.negative_log_likelihood),
-          np.sum(scipy.stats.sem(detector.negative_log_likelihood, axis=0)))
-    print("a", prior_a)
-    print("b", prior_b)
-    print("intensity", intensity)
-    print("beta var prior", prior_var_scale)
+    # Print results for the table in the ICML paper
+    print("\n")
+    print("***** Predictive MSE + NLL from Table 1 in ICML 2018 paper *****")
+    print("MSE is %.5g with 95%% error of %.5g" %
+          (np.sum(np.mean(detector.MSE, axis=0)), np.sum(1.96 * stats.sem(detector.MSE))))
+    print("NLL is %.5g with 95%% error of %.5g" %
+          (np.mean(detector.negative_log_likelihood), 1.96 * stats.sem(detector.negative_log_likelihood)))
+
+    # Print some details about the CPs and models
+    print("\n")
+    print("***** CP and model details *****")
     print("MAP CPs at times", [1996.91 + e[0] / 252 for e in detector.CPs[-2]])
     print("MAP models", [e[1] for e in detector.CPs[-2]])
+
+    # Print out the settings
+    print("\n")
+    print("***** Parameter values and other options *****")
+    print("prior_a:", prior_a)
+    print("prior_b:", prior_b)
+    print("prior_mean_scale:", prior_mean_scale)
+    print("prior_var_scale:", prior_var_scale)
+    print("intensity:", intensity)
+    print("normalize:", normalize)
+    print("build_weak_coupling:", build_weak_coupling)
+    print("build_strong_coupling:", build_strong_coupling)
+    print("build_sic_nbhs:", build_sic_nbhs)
+    print("build_cor_nbhs:", build_cor_nbhs)
+    print("build_autocorr_nbhs:", build_autocorr_nbhs)
+    print("AR_nbhs:", AR_nbhs)
+    print("heavy_tails_transform:", heavy_tails_transform)
+    print("time_frame:", time_frame)
+    print("hyperpar_opt:", hyperpar_opt)
