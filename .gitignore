@@ -4,6 +4,9 @@
 # PyCharm files/folders
 .idea/
 
+# Project folders
+Output/
+
 ################################
 ### GitHub Python .gitignore ###
 ################################
