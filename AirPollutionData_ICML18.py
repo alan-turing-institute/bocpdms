@@ -32,24 +32,18 @@ if daily_avg:
 deseasonalize_day = True #only one of the two deseasonalizations should be 
                         #chosen, and this one means that we only take weekday 
                         #averages
-shortened, shortened_to = False, 500 #wheter to process only the first 
+shortened, shortened_to = False, 540 #wheter to process only the first
                                      #shortened_to observations and stop then
 
 """folder containing dates and data (with result folders being created at 
 run-time if necessary)"""
-baseline_working_directory = ("//Users//jeremiasknoblauch//Documents//OxWaSP"+
-    "//BOCPDMS//Code//SpatialBOCD//Data//AirPollutionData")
-
-"""subset of the Airpollution data analyzed"""
-cp_type = "CongestionChargeData" #only option available, originally wanted to
-                                    #look at another time frame but didn't
+data_directory = os.path.join(os.getcwd(), "Data", "APData", "CongestionChargeData")
+output_directory = os.path.join(os.getcwd(), "Output")
                                     
 """Distance matrices computed using symmetrized road distances (i.e., taking
 d(i,j) = 0.5*[d_road(i,j) + d_road(j,i)] and euclidean distances"""
-dist_file_road = (baseline_working_directory + "//" + cp_type + "//" + 
-                  "RoadDistanceMatrix_")
-dist_file_euclid = (baseline_working_directory + "//" + cp_type + "//" + 
-                   "EuclideanDistanceMatrix_")
+dist_file_road = os.path.join(data_directory, "RoadDistanceMatrix_")
+dist_file_euclid = os.path.join(data_directory, "EuclideanDistanceMatrix_")
 
 """File prototype for 2h-averaged station data from 08/17/2002 - 08/17/2003"""
 prototype = "_081702-081703_2h.txt"
@@ -137,8 +131,7 @@ for location in range(0, num_stations):
 """STEP 3: Read in station data for each station"""
 station_data = []
 for id_ in stationIDs:
-    file_name = (baseline_working_directory + "//" + cp_type + "//" + 
-                 id_ + prototype)
+    file_name = os.path.join(data_directory, id_ + prototype)
     
     """STEP 3.1: Read in raw data"""
     #NOTE: Skip the header 
@@ -356,44 +349,46 @@ for intensity in intensity_list:
                     EvT.build_EvaluationTool_via_run_detector(detector)
                             
                     """store that EvT object onto hard drive"""
-                    prior_spec_str = ("//" + cp_type + "//a=" + str(a) + 
-                        "//b=" + str(b) )
-                    detector_path = (baseline_working_directory  + 
-                                prior_spec_str + "//daily_good_recreated")
+                    detector_path = os.path.join(output_directory, "AP_a" + str(a) + "_b" + str(b) +
+                                                                   "_i" + str(intensity) + "_v" + str(var_scale))
                     if not os.path.exists(detector_path):
                         os.makedirs(detector_path)
-                    
-                    results_path = detector_path + "//results.txt" 
-                    EvT.store_results_to_HD(results_path)
-                    
-                    fig = EvT.plot_predictions(
-                            indices = [0], print_plt = True, 
-                            legend = False, 
-                            legend_labels = None, 
-                            legend_position = None, 
-                            time_range = None,
-                            show_var = False, 
-                            show_CPs = True)
-                    plt.close(fig)
-                    fig = EvT.plot_run_length_distr(
-                        print_plt = True, 
-                        time_range = None,
-                        show_MAP_CPs = True, 
-                        show_real_CPs = False,
-                        mark_median = False, 
-                        log_format = True,
-                        CP_legend = False, 
-                        buffer = 50)
-                    plt.close(fig)
+
+                    if shortened:
+                        EvT.store_results_to_HD(os.path.join(detector_path, "results_short" + str(shortened_to) + ".txt"))
+                    else:
+                        EvT.store_results_to_HD(os.path.join(detector_path, "results.txt"))
+
+                    # To do: move plots to paper_pictures script (the two below weren't used in the paper but are
+                    # still of interest)
+                    # fig = EvT.plot_predictions(
+                    #         indices = [0], print_plt = True,
+                    #         legend = False,
+                    #         legend_labels = None,
+                    #         legend_position = None,
+                    #         time_range = None,
+                    #         show_var = False,
+                    #         show_CPs = True)
+                    # plt.close(fig)
+                    # fig = EvT.plot_run_length_distr(
+                    #     print_plt = True,
+                    #     time_range = None,
+                    #     show_MAP_CPs = True,
+                    #     show_real_CPs = False,
+                    #     mark_median = False,
+                    #     log_format = True,
+                    #     CP_legend = False,
+                    #     buffer = 50)
+                    # plt.close(fig)
                     
                     print("MSE", np.mean(detector.MSE))
                     print("NLL", np.mean(detector.negative_log_likelihood))
-                    print("a", a)
-                    print("b", b)
-                    print("intensity", intensity)
-                    print("beta var prior", var_scale )
 
-
-
-
-
+                    print("a:", a)
+                    print("b:", b)
+                    print("intensity:", intensity)
+                    print("beta var prior:", var_scale)
+                    print("normalised:", normalize)
+                    print("daily averaged:", daily_avg)
+                    print("deseasonalised (2h):", deseasonalize_2h)
+                    print("deseasonalised (day):", deseasonalize_day)
