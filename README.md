@@ -49,16 +49,6 @@ Creating a separate virtual environment for each project you are reproducing has
 You can create a new virtual environment using python's built-in `venv` command (see [*instructions with venv*](#instructions-with-virtualenv) below), or with `conda` ([*instructions with conda*](#instructions-with-conda)).
 
 
-#### Instructions with virtualenv
-
-*Installation instructions with virtualenv coming soon*
-
-[venv](https://docs.python.org/3/library/venv.html)
-
-**NOTE:**  The tests in this project will fail when run in a virtual environment created using virtualenv.
-This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
-If you use virtualenv to manage your python environment, please use python's built-in [venv](https://docs.python.org/3/library/venv.html) command to create your virtual environment for this project.
-
 #### Instructions with conda:
 
 For more detailed instructions, check out the conda [managing environments](https://conda.io/docs/user-guide/tasks/manage-environments.html) documentation.
@@ -78,14 +68,15 @@ conda install nb_conda_kernels
 ```
 You can then launch Jupyter Lab using `jupyter lab` while your virtual environment is active.
 
+
 #### Instructions with venv:
 
+For OSX or Linux, you can use venv instead of anaconds.
 For more detailed instructions, check out the [venv documentation](https://docs.python.org/3/library/venv.html) documentation.
 Hopefully though, the following commands are enough to get you started.
 
 From inside the `bocpdms` folder on your computer:
 
-##### OSX or Linux
 Feel free to change the folder the virtual environemnt is created in by replacing `~/.virtualenvs/bocpdms` with a path of your choice in both commands.
 ```
 python3 -m venv ~/.virtualenvs/bocpdms
@@ -100,9 +91,13 @@ ipython kernel install --user --name=venv-bocpdms
 ```
 You can then launch Jupyter Lab using `jupyter lab` while your virtual environment is active.
 
-##### Windows
-We recommend using conda on Windows. However, if you know how to use venv on Windows then please let us know by opening an
-[issue](https://github.com/alan-turing-institute/bocpdms/issues) (to let us know how to do this) or submitting a [pull request](https://github.com/alan-turing-institute/bocpdms/pulls) (if you are comfortable forking this repository and adding the Windows instructions to here in this README yourself.
+#### Virtualenv not supported:
+This project will not run a virtual environment created using virtualenv.
+This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
+If you use virtualenv to manage your python environment, please use python's built-in [venv](https://docs.python.org/3/library/venv.html) command to create your virtual environment for this project.
+
+We recommend you use conda or venv instead (see instructions above).
+
 
 
 ### Run the tests
