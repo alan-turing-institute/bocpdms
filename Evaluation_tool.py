@@ -1672,7 +1672,7 @@ class EvaluationTool:
         the right dimensions in the next step"""
         r_max = 0
         storage_all_retained_run_lengths = self.results[self.names.index(
-                "all retained run lenghts")]
+                "all retained run lengths")]
         for run_lengths in storage_all_retained_run_lengths:
             r_max = max(r_max, np.max(run_lengths))
             """if we have upper limit, enforce"""
