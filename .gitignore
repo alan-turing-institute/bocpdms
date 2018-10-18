@@ -1,3 +1,6 @@
+# VScode specific file
+.vscode/
+
 # MacOS-specific files
 .DS_Store
 

@@ -1,0 +1,61 @@
+{
+  "projectName": "bocpdms",
+  "projectOwner": "alan-turing-institute",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 100,
+  "commit": true,
+  "contributors": [
+    {
+      "login": "JeremiasKnoblauch",
+      "name": "Jeremias Knoblauch",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/21968230?v=4",
+      "profile": "https://github.com/JeremiasKnoblauch",
+      "contributions": [
+        "question",
+        "code",
+        "design",
+        "doc",
+        "example",
+        "ideas"
+      ]
+    },
+    {
+      "login": "LouiseABowler",
+      "name": "Louise Bowler",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/25640708?v=4",
+      "profile": "https://github.com/LouiseABowler",
+      "contributions": [
+        "code",
+        "doc",
+        "talk",
+        "test"
+      ]
+    },
+    {
+      "login": "martintoreilly",
+      "name": "Martin O'Reilly",
+      "avatar_url": "https://avatars3.githubusercontent.com/u/21147592?v=4",
+      "profile": "https://github.com/martintoreilly",
+      "contributions": [
+        "doc",
+        "fundingFinding",
+        "review",
+        "talk"
+      ]
+    },
+    {
+      "login": "KirstieJane",
+      "name": "Kirstie Whitaker",
+      "avatar_url": "https://avatars1.githubusercontent.com/u/3626306?v=4",
+      "profile": "https://whitakerlab.github.io",
+      "contributions": [
+        "doc",
+        "fundingFinding"
+      ]
+    }
+  ]
+}
