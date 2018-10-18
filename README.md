@@ -39,7 +39,7 @@ You can keep track of our progress through the Issues tab, and find out more abo
 
 ### Why use a virtual environment?
 
-A virtual environment is an isolated instance of python that has it's own separately managed set of installed libraries (depandencies).
+A virtual environment is an isolated instance of python that has it's own separately managed set of installed libraries (dependencies).
 Creating a separate virtual environment for each project you are reproducing has two key advantages:
 
   1. It ensures you are using **only** the libraries specified by the authors.
