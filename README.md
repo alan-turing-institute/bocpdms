@@ -39,12 +39,12 @@ You can keep track of our progress through the Issues tab, and find out more abo
 
 ### Why use a virtual environment?
 
-A virtual environment is an isolated instance of python that has it's own separately managed set of installed libraries (dependencies).
-Creating a separate virtual environment for each project you are reproducing has two key advantages:
+A virtual environment is an isolated instance of python that has its own separately managed set of installed libraries (dependencies).
+Creating a separate virtual environment for each project you are reproducing has the following advantages:
 
   1. It ensures you are using **only** the libraries specified by the authors.
     This verifies that they have provided **all** the information about the required libraries necessary to reproduce their work and that you are not accidentally relying on previously installed versions of common libraries.
-  2. It ensure that you are using the **same versions** of the libraries specified by the authors.
+  2. It ensures that you are using the **same versions** of the libraries specified by the authors.
      This ensures that a failure to reproduce is not caused by changes to libraries made between the authors publishing their project and you attempting to reproduce it.
   3. It ensures that none of the libraries required for the project interfere with the libraries installed in the standard python environment you use for your day to day work.
 
@@ -77,7 +77,7 @@ You can then launch Jupyter Lab using `jupyter lab` while your virtual environme
 
 #### Instructions with venv
 
-For OSX or Linux, you can use venv instead of anaconda.
+For OSX or Linux, you can use `venv` instead of `conda`.
 For more detailed instructions, check out the [venv documentation](https://docs.python.org/3/library/venv.html) documentation.
 Hopefully though, the following commands are enough to get you started.
 
