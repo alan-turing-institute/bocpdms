@@ -36,20 +36,25 @@ You can keep track of our progress through the Issues tab, and find out more abo
 4. Install the required packages using `pip install -r requirements.txt`
 5. \[Optional] Verify that everything is working by running the tests (see [*run the tests*](#run-the-tests) below)
 
+
 ### Why use a virtual environment?
 
 A virtual environment is an isolated instance of python that has it's own separately managed set of installed libraries (depandencies).
 Creating a separate virtual environment for each project you are reproducing has two key advantages:
- 1. It ensures you are using **only** the libraries specified by the authors.
+
+  1. It ensures you are using **only** the libraries specified by the authors.
     This verifies that they have provided **all** the information about the required libraries necessary to reproduce their work and that you are not accidentally relying on previously installed versions of common libraries.
   2. It ensure that you are using the **same versions** of the libraries specified by the authors.
      This ensures that a failure to reproduce is not caused by changes to libraries made between the authors publishing their project and you attempting to reproduce it.
   3. It ensures that none of the libraries required for the project interfere with the libraries installed in the standard python environment you use for your day to day work.
 
-You can create a new virtual environment using python's built-in `venv` command (see [*instructions with venv*](#instructions-with-virtualenv) below), or with `conda` ([*instructions with conda*](#instructions-with-conda)).
+You can create a new virtual environment using python's built-in `venv` command (see [*instructions with venv*](#instructions-with-virtualenv) below), or with `conda` ([*instructions with conda*](#instructions-with-conda)). 
+
+Note that this project will not run a virtual environment created using `virtualenv`.
+This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
 
 
-#### Instructions with conda:
+#### Instructions with conda
 
 For more detailed instructions, check out the conda [managing environments](https://conda.io/docs/user-guide/tasks/manage-environments.html) documentation.
 Hopefully though, the following commands are enough to get you started.
@@ -61,7 +66,8 @@ conda create -n bocpdms python=3.7
 conda activate bocpdms
 pip install -r requirements.txt
 ```
-as a fun little side note, if you want to use jupyter lab with this new environment, you should also run the following command so you can see this new `bocpdms` kernel :sparkles:
+
+If you want to use `jupyter lab` with this new environment, you should also run the following command so you can see this new `bocpdms` kernel :sparkles:
 ```
 conda install -c conda-forge jupyterlab
 conda install nb_conda_kernels
@@ -69,9 +75,9 @@ conda install nb_conda_kernels
 You can then launch Jupyter Lab using `jupyter lab` while your virtual environment is active.
 
 
-#### Instructions with venv:
+#### Instructions with venv
 
-For OSX or Linux, you can use venv instead of anaconds.
+For OSX or Linux, you can use venv instead of anaconda.
 For more detailed instructions, check out the [venv documentation](https://docs.python.org/3/library/venv.html) documentation.
 Hopefully though, the following commands are enough to get you started.
 
@@ -83,21 +89,13 @@ python3 -m venv ~/.virtualenvs/bocpdms
 source ~/.virtualenvs/bocpdms/bin/activate
 pip install -r requirements.txt
 ```
-as a fun little side note, if you want to use jupyter lab with this new environment, you should also run the following command so you can see this new `bocpdms` kernel :sparkles:
+If you want to use jupyter lab with this new environment, you should also run the following command so you can see this new `bocpdms` kernel :sparkles:
 ```
 pip install jupyterlab
 pip install ipykernel
 ipython kernel install --user --name=venv-bocpdms
 ```
 You can then launch Jupyter Lab using `jupyter lab` while your virtual environment is active.
-
-#### Virtualenv not supported:
-This project will not run a virtual environment created using virtualenv.
-This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
-If you use virtualenv to manage your python environment, please use python's built-in [venv](https://docs.python.org/3/library/venv.html) command to create your virtual environment for this project.
-
-We recommend you use conda or venv instead (see instructions above).
-
 
 
 ### Run the tests
