@@ -58,6 +58,6 @@ virtualenv. This is due to a [known issue with matplotlib and virtualenv](https:
 please use python's built-in [venv](https://docs.python.org/3/library/venv.html) command
 to create your virtual environment for this project.
 
-### Running tests
+#### Running tests
 From the repository directory run `python -m pytest`. This will run all the tests
 in the `tests/` folder of the project.
