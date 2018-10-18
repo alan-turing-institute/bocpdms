@@ -28,6 +28,92 @@ Each of the Champions' projects will receive several weeks of support from the R
 
 You can keep track of our progress through the Issues tab, and find out more about the Turing's Reproducible Research Champions project [here](https://github.com/alan-turing-institute/ReproducibleResearchResources).
 
-## Installation Instructions
+## Installation instructions
 
-_Installation and usage instructions will be available shortly..._
+1. Clone this repository (see [this useful guide](https://help.github.com/articles/cloning-a-repository/) to get started)
+2. Change to the repository directory on your local machine
+3. \[Optional] Create a new virtual environment for this project (see [*why use a virtual environment*](#why-use-a-virtual-environment) below)
+4. Install the required packages using `pip install -r requirements.txt`
+5. \[Optional] Verify that everything is working by running the tests (see [*run the tests*](#run-the-tests) below)
+
+
+### Why use a virtual environment?
+
+A virtual environment is an isolated instance of python that has its own separately managed set of installed libraries (dependencies).
+Creating a separate virtual environment for each project you are reproducing has the following advantages:
+
+  1. It ensures you are using **only** the libraries specified by the authors.
+    This verifies that they have provided **all** the information about the required libraries necessary to reproduce their work and that you are not accidentally relying on previously installed versions of common libraries.
+  2. It ensures that you are using the **same versions** of the libraries specified by the authors.
+     This ensures that a failure to reproduce is not caused by changes to libraries made between the authors publishing their project and you attempting to reproduce it.
+  3. It ensures that none of the libraries required for the project interfere with the libraries installed in the standard python environment you use for your day to day work.
+
+You can create a new virtual environment using python's built-in `venv` command (see [*instructions with venv*](#instructions-with-virtualenv) below), or with `conda` ([*instructions with conda*](#instructions-with-conda)). 
+
+Note that this project will not run a virtual environment created using `virtualenv`.
+This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
+
+
+#### Instructions with conda
+
+For more detailed instructions, check out the conda [managing environments](https://conda.io/docs/user-guide/tasks/manage-environments.html) documentation.
+Hopefully though, the following commands are enough to get you started.
+
+From inside the `bocpdms` folder on your computer:
+
+```
+conda create -n bocpdms python=3.7
+conda activate bocpdms
+pip install -r requirements.txt
+```
+
+If you want to use `jupyter lab` with this new environment, you should also run the following command so you can see this new `bocpdms` kernel :sparkles:
+```
+conda install -c conda-forge jupyterlab
+conda install nb_conda_kernels
+```
+You can then launch Jupyter Lab using `jupyter lab` while your virtual environment is active.
+
+
+#### Instructions with venv
+
+For OSX or Linux, you can use `venv` instead of `conda`.
+For more detailed instructions, check out the [venv documentation](https://docs.python.org/3/library/venv.html) documentation.
+Hopefully though, the following commands are enough to get you started.
+
+From inside the `bocpdms` folder on your computer:
+
+Feel free to change the folder the virtual environemnt is created in by replacing `~/.virtualenvs/bocpdms` with a path of your choice in both commands.
+```
+python3 -m venv ~/.virtualenvs/bocpdms
+source ~/.virtualenvs/bocpdms/bin/activate
+pip install -r requirements.txt
+```
+If you want to use jupyter lab with this new environment, you should also run the following command so you can see this new `bocpdms` kernel :sparkles:
+```
+pip install jupyterlab
+pip install ipykernel
+ipython kernel install --user --name=venv-bocpdms
+```
+You can then launch Jupyter Lab using `jupyter lab` while your virtual environment is active.
+
+
+### Run the tests
+
+From the repository directory run `python -m pytest`.
+
+This will run all the tests in the `tests` folder of the project.
+
+You should see the following celebratory message :tada::sparkles::cake:
+
+```
+============================= test session starts =============================
+platform win32 -- Python 3.7.0, pytest-3.7.1, py-1.7.0, pluggy-0.8.0
+rootdir: \path\to\your\version\of\bocpdms, inifile:
+collected 6 items
+
+tests\test_Evaluation_tool.py .....                                      [ 83%]
+tests\test_nile_example.py .                                             [100%]
+
+========================== 6 passed in 17.83 seconds ==========================
+```
