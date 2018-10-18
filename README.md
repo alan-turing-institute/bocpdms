@@ -30,7 +30,7 @@ You can keep track of our progress through the Issues tab, and find out more abo
 
 ## Installation instructions
 
-1. [Clone this repository](https://help.github.com/articles/cloning-a-repository/)
+1. Clone this repository (see [this useful guide](https://help.github.com/articles/cloning-a-repository/) to get started)
 2. Change to the repository directory on your local machine
 3. \[Optional] Create a new virtual environment for this project (see [*why use a virtual environment*](#why-use-a-virtual-environment) below)
 4. Install the required packages using `pip install -r requirements.txt`
@@ -40,21 +40,29 @@ You can keep track of our progress through the Issues tab, and find out more abo
 
 A virtual environment is an isolated instance of python that has it's own separately managed set of installed libraries (depandencies).
 Creating a separate virtual environment for each project you are reproducing has two key advantages:
- 1. It ensures you are using **only** the libraries specified by the authors. This verifies that
-    they have provided **all** the information about the required libraries necessary to
-    reproduce their work and that you are not accidentally relying on previously installed
-    versions of common libraries.
-  2. It ensure that you are using the **same versions** of the libraries specified by the
-     authors. This ensures that a failure to reproduce is not caused by changes to libraries
-     made between the authors publishing their project and you attempting to reproduce it.
-  3. It ensures that none of the libraries required for the project interfere with the
-    libraries installed in the standard python environment you use for your day to day work.
+ 1. It ensures you are using **only** the libraries specified by the authors.
+    This verifies that they have provided **all** the information about the required libraries necessary to reproduce their work and that you are not accidentally relying on previously installed versions of common libraries.
+  2. It ensure that you are using the **same versions** of the libraries specified by the authors.
+     This ensures that a failure to reproduce is not caused by changes to libraries made between the authors publishing their project and you attempting to reproduce it.
+  3. It ensures that none of the libraries required for the project interfere with the libraries installed in the standard python environment you use for your day to day work.
 
-You can create a new virtual environment using python's built-in [venv](https://docs.python.org/3/library/venv.html) command.
-Alternatively, if you use Anaconda to manage your python environment, you can [create a virtual environment
-from within Anaconda](https://conda.io/docs/user-guide/tasks/manage-environments.html).
+You can create a new virtual environment using python's built-in `venv` command (see [*instructions with venv*](#instructions-with-virtualenv) below), or with `conda` ([*instructions with conda*](#instructions-with-conda)).
 
-#### Instructions w conda:
+
+#### Instructions with virtualenv
+
+*Installation instructions with virtualenv coming soon*
+
+[venv](https://docs.python.org/3/library/venv.html)
+
+**NOTE:**  The tests in this project will fail when run in a virtual environment created using virtualenv.
+This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
+If you use virtualenv to manage your python environment, please use python's built-in [venv](https://docs.python.org/3/library/venv.html) command to create your virtual environment for this project.
+
+#### Instructions with conda:
+
+For more detailed instructions, check out the conda [managing environments](https://conda.io/docs/user-guide/tasks/manage-environments.html) documentation.
+Hopefully though, the following commands are enough to get you started.
 
 From inside the `bocpdms` folder on your computer:
 
@@ -69,22 +77,16 @@ conda install -c conda-forge jupyterlab
 conda install nb_conda_kernels
 ```
 
-#### Instructions with virtualenv
-
-**NOTE:**  The tests in this project will fail when run in a virtual environment created using
-virtualenv.
-This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
-If you use virtualenv to manage your python environment, please use python's built-in [venv](https://docs.python.org/3/library/venv.html) command to create your virtual environment for this project.
 
 ### Run the tests
 
 From the repository directory run `python -m pytest`.
 
-This will run all the tests in the `tests/` folder of the project.
+This will run all the tests in the `tests` folder of the project.
 
 You should see the following celebratory message :tada::sparkles::cake:
 
-```bash
+```
 ============================= test session starts =============================
 platform win32 -- Python 3.7.0, pytest-3.7.1, py-1.7.0, pluggy-0.8.0
 rootdir: \path\to\your\version\of\bocpdms, inifile:
