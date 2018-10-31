@@ -1,8 +1,20 @@
 # BOCPDMS: Bayesian On-line Changepoint Detection with Model Selection
 
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/alan-turing-institute/bocpdms/master)
+
 This repository contains code from the _Bayesian On-line Changepoint Detection with Model Selection_ project.
 
-## Introduction to BOCPDMS
+## Table of contents
+
+* [About BOCPDMS](#about-bocpdms)
+* [Citing this project](#citing-this-project)
+* [Installation instructions](#installation-instructions)
+* [Running the examples](#running-the-examples)
+* [Reproducible research champions program](#reproducible-research-champions-program)
+* [Contributors](#contributors)
+
+
+## About BOCPDMS
 
 Bayesian On-line Changepoint Detection (BOCPD) is a discrete-time inference framework introduced in the statistics and machine learning community independently by [Fearnhead & Liu (2007)](https://doi.org/10.1111/j.1467-9868.2007.00601.x) and [Adams & MacKay (2007)](https://arxiv.org/abs/0710.3742). Taken together, both papers have generated in excess of 500 citations and inspired more research in this area. The method is popular because it is efficient and runs in constant time per observation processed. We are working on extending the inference paradigm in several ways:
 
@@ -48,7 +60,7 @@ Creating a separate virtual environment for each project you are reproducing has
      This ensures that a failure to reproduce is not caused by changes to libraries made between the authors publishing their project and you attempting to reproduce it.
   3. It ensures that none of the libraries required for the project interfere with the libraries installed in the standard python environment you use for your day to day work.
 
-You can create a new virtual environment using python's built-in `venv` command (see [*instructions with venv*](#instructions-with-virtualenv) below), or with `conda` ([*instructions with conda*](#instructions-with-conda)). 
+You can create a new virtual environment using python's built-in `venv` command (see [*instructions with venv*](#instructions-with-virtualenv) below), or with `conda` ([*instructions with conda*](#instructions-with-conda)).
 
 Note that this project will not run a virtual environment created using `virtualenv`.
 This is due to a [known issue with matplotlib and virtualenv](https://matplotlib.org/faq/osx_framework.html).
