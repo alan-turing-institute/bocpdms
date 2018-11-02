@@ -49,33 +49,10 @@ class ProbabilityModel:
         """Initialize the joint_probabilities before the first iteration!"""
         pass
     
-    def rescale_DPD_run_length_distribution(self, log_scale_new, 
-                                        rescaler_for_old_obs, t):
-        """Rescales joint log probs"""
-        if rescaler_for_old_obs is None:
-            self.joint_log_probabilities = (self.joint_log_probabilities 
-                                            - log_scale_new)
-        else:
-            self.joint_log_probabilities[0] = (self.joint_log_probabilities[0] 
-                    - log_scale_new)
-            self.joint_log_probabilities[1:] = (
-                    self.joint_log_probabilities[1:] + rescaler_for_old_obs)
-        self.model_log_evidence = scipy.misc.logsumexp(
-                self.joint_log_probabilities)
-    
     #SUPER CLASS IMPLEMENTATION
     #CALLED BY DETECTOR
-    def update_joint_log_probabilities(
-                self, 
-                y, t, cp_model, model_prior,
-                log_model_posteriors,
-                log_CP_evidence, 
-                log_model_posteriors_der = None, 
-                log_model_posteriors_der_sign = None,
-                log_CP_evidence_der = None, 
-                log_CP_evidence_der_sign = None,
-                do_general_bayesian_hyperparameter_optimization = False, 
-                disable_hyperparameter_optimization = False):
+    def update_joint_log_probabilities(self, y,t, cp_model, model_prior,
+                log_model_posteriors, log_CP_evidence):
         #DEBUG: model_prior should not be needed anymore. Just put it into
         #       model_posterior, position 0.
         """Is called to update growth- and CP probabilities. That means it is 
@@ -93,9 +70,6 @@ class ProbabilityModel:
         
         NOTE: Desirable to also implement SOR/SCR of Fearnhead & Liu (2007) 
         in order for this to scale in constant time!
-        
-        NOTE: the derivatives (and signs thereof) are only needed if we do
-        hyperparameter-optimization for alpha.
         """
 
 
@@ -106,175 +80,19 @@ class ProbabilityModel:
         """ 
         self.r0_log_prob = self.evaluate_log_prior_predictive(y,t)
         #predictive_log_probs = self.evaluate_predictive_log_distribution(y,t)
-        self.one_step_ahead_predictive_log_probs = (
-                self.evaluate_predictive_log_distribution(y,t))
+        predictive_log_probs = self.evaluate_predictive_log_distribution(y,t)
         #DEBUG: Here, we store the predictive distros y_t|y_1:t-1,r_t-1,m_t-1
         #NOTE: we do not want the cp prob in here because that is a NEW 
-        """NOTE: Unclear if this needs to be treated separately from General 
-        Bayesian updating, since it is re-used in the gradient!
-        ANSWER: It does NOT need to be treated separately. Instead, we need to
-        get the gradient under generalized Bayesian updating and change
-        that in the code for each model..."""
-        #DEBUG: Parameter updating should be based on General Bayes, too if
-        #       we base joint probability computation on it!
-        
+        self.one_step_ahead_predictive_log_probs = predictive_log_probs.copy()
             #np.insert(predictive_log_probs.copy(), 0, r0_log_prob)
         
-        #DEBUG: Here, compute joint log probs for alpha + eps and alpha - eps
-        #       if required
-        
-        
-        #DEBUG: Check out if General Bayes works at all
-        #DEBUG: What about CP probability? not considered here.
-        #DEBUG: Incorrect, since we have PB(y,r,m) = prior * exp(-sum(loss)),
-        #       so taking logs give log(prior)  + -sum(loss), 
-        if self.generalized_bayes_rld == "power_divergence":
-            integrals = self.get_log_integrals_power_divergence()
-            """Note: If we have the power divergence loss, then our log of 
-            the loss should be computed from the predictive probabilities 
-            appropriately"""
-            #print("self.one_step_ahead_predictive_log_probs", self.one_step_ahead_predictive_log_probs)
-            #print("integrals", integrals)
+        """STEP 2: update all no-CP joint probabilities, so-called 'growth 
+        probabilities' to follow MacKay's naming convention. There will be t
+        of them, namely for r=1,2,...,t-1, > t-1, with the last probability
+        always being 0 unless we have boundary conditions allowing for
+        non-zero probability that we are already in the middle of a segment
+        at the first observation."""
             
-            #DEBUG: Check if np.log(maxFloat) >= any value in integrals.
-            max_val = np.log(np.finfo(np.float64).max)
-            #Split integral term s.t. you set terms exceeding max_val to max_val
-            #and leave the rest. Similarly for the one step ahead pred.
-            
-            
-            """STEP 1: Correct the integral term by bounding"""
-            integral_exceeds = np.where(integrals >= max_val)[0]
-            integral_fine = np.where(integrals < max_val)[0]
-            integral_exp = integrals
-            
-#            print("integrals", integrals)
-#            print("integrals too large", integrals[integral_exceeds])
-#            print("integrals fine", integrals[integral_fine])
-#            print("integral exceeds", integral_exceeds)
-            
-            if len(integral_exceeds)>0:
-                integral_exp[integral_exceeds] = (
-                        min(1.0,(1.0/(self.alpha_rld+1.0)))*
-                        (np.finfo(np.float64).max)
-                )
-            if len(integral_fine)>0:
-                """Just do the standard thing"""
-                integral_exp[integral_fine] = (
-                        (1.0/(self.alpha_rld+1.0))*
-                         np.exp(integrals[integral_fine])
-                    )
-            
-            """STEP 2: Correct the predictive probs"""
-            
-            """STEP 2.1: Correct CP prob if necessary"""
-            if self.r0_log_prob >= max_val:
-                r0_log_prob_exp = (min(1.0, 1.0/self.alpha_rld) * 
-                                   (min(self.alpha_rld, 1) * max_val))
-            else:
-                r0_log_prob_exp = (1.0/self.alpha_rld)*np.exp(
-                    self.r0_log_prob*self.alpha_rld)
-            
-            """STEP 2.2: Correct other probs"""
-            step_ahead_exceeds = np.where(
-                    self.one_step_ahead_predictive_log_probs >= max_val)[0]
-            step_ahead_fine = np.where(
-                    self.one_step_ahead_predictive_log_probs < max_val)[0]
-            step_ahead_exp = self.one_step_ahead_predictive_log_probs.copy()
-            if len(step_ahead_exceeds)>0:
-                if self.alpha_rld < 1:
-                    """If the max value will be downweighted by alpha"""
-                    step_ahead_exp[step_ahead_exceeds] = (
-                            min(1.0,1.0/(self.alpha_rld))*
-                            (np.finfo(np.float64).max * self.alpha_rld)
-                    )
-                else:
-                    """If the max value will be increased by alpha"""
-                    step_ahead_exp[step_ahead_exceeds] = (
-                            min(1.0,(1.0/(self.alpha_rld)))*
-                            (np.finfo(np.float64).max)
-                    )
-            if len(step_ahead_fine)>0:
-                """Just do the standard thing"""
-                step_ahead_exp[step_ahead_fine] = (
-                        ((1.0/(self.alpha_rld))*
-                         np.exp(
-                            self.one_step_ahead_predictive_log_probs[
-                                    step_ahead_fine]*
-                            self.alpha_rld)
-                    ))
-                        
-            
-            #DEBUG: Original/naive/simple version (not numerically stable)
-#            if True:
-#                #NOTE: If you are going to use these, need to add .copy()
-#                #       to integral and step_ahead_exp
-#                self.one_step_ahead_predictive_log_loss_2 = ((1.0/self.alpha_rld)*
-#                        np.power(np.exp(self.one_step_ahead_predictive_log_probs), 
-#                             self.alpha_rld) - 
-#                        (1.0/(self.alpha_rld+1.0))*np.exp(integrals[1:])
-#                    )
-#                
-#                        
-#                self.r0_log_loss_2 = (1.0/self.alpha_rld*np.power(np.exp(
-#                        self.r0_log_prob), self.alpha_rld) 
-#                    - (1.0/(self.alpha_rld+1.0))*np.exp(integrals[0]))
-                        
-            self.one_step_ahead_predictive_log_loss = (
-                    step_ahead_exp - integral_exp[1:])
-            self.r0_log_loss = r0_log_prob_exp - integral_exp[0]
-            
-#            print("original growth", self.one_step_ahead_predictive_log_loss_2)
-#            print("new growth", self.one_step_ahead_predictive_log_loss)
-#            print("original cp", self.r0_log_loss_2)
-#            print("new cp", self.r0_log_loss)
-#            print("replaced growth & cp & integ", len(step_ahead_exceeds), 
-#                  (self.r0_log_prob >= max_val),  len(integral_exceeds))
-#            print("original log prob component", 
-#                  ((1.0/self.alpha_rld)*
-#                   np.power(np.exp(self.one_step_ahead_predictive_log_probs), self.alpha_rld)))
-#            print("new log prob component", 
-#                  step_ahead_exp)
-#            print("original integral component", 
-#                  ((1.0/(self.alpha_rld+1.0))*np.exp(integrals)))
-#            print("new integral component", 
-#                  integral_exp)
-            
-            """NOTE: At this stage, we have computed the predictive densities, 
-            but still have the old joint probabilities. So this is the perfect 
-            time for updating alpha. 
-            UNCLEAR: Should we use the updated version in this iteration, or 
-                     only in the next one?"""
-            #DEBUG: Need to put more inputs into update_joint_log_probs from
-            #       Detector level.
-            #DEBUG: Need to initialize the alpha-derivatives to make sure that
-            #       first call does not fail
-            #DEBUG: Make sure that we only do this from time t=2 onwards, i.e.
-            #       after we have actually observed stuff! Need to 
-            #       pass in the relevant boolean!
-            if (self.alpha_rld_learning and 
-                do_general_bayesian_hyperparameter_optimization and
-                disable_hyperparameter_optimization is not True):
-                """updates the log of the joint probabilities' derivatives 
-                with respect to alpha. probability_model level function"""
-                self.update_alpha_derivatives(y, t,
-                                 log_model_posteriors,
-                                 log_model_posteriors_der, 
-                                 log_model_posteriors_der_sign,
-                                 log_CP_evidence, 
-                                 log_CP_evidence_der, 
-                                 log_CP_evidence_der_sign,
-                                 model_prior,
-                                 cp_model)
-                """Use the derivatives to update the value of alpha via 
-                stochastic gradient descent inside Detector later"""
-        elif self.generalized_bayes_rld == "kullback_leibler":
-            """Note: In the case of KL, the predictive density is exactly
-            the loss function! So the log of the loss function is simply the
-            log of the predictive density"""
-            self.r0_log_loss = self.r0_log_prob      
-            self.one_step_ahead_predictive_log_loss = (
-                    self.one_step_ahead_predictive_log_probs.copy())
-        #print(predictive_log_probs.shape)
             
         
         #DEBUG: evaluated log prob for r=0 is not in here! (Is only needed for
@@ -288,27 +106,12 @@ class ProbabilityModel:
         #print("predictive_log_probs ", predictive_log_probs.shape)
         #print("r0 log prob", r0_log_prob)
         #print("log CP evidence", log_CP_evidence)
-        
-        """STEP 2: update all no-CP joint probabilities, so-called 'growth 
-        probabilities' to follow MacKay's naming convention. There will be t
-        of them, namely for r=1,2,...,t-1, > t-1, with the last probability
-        always being 0 unless we have boundary conditions allowing for
-        non-zero probability that we are already in the middle of a segment
-        at the first observation."""
-#        print("self.one_step_ahead_predictive_log_loss",self.one_step_ahead_predictive_log_loss)
-#        print("self.joint_log_probabilities BEFORE update", self.joint_log_probabilities)
-#        print("log_model_posteriors", log_model_posteriors)
-        try:
-            growth_log_probabilities = (self.one_step_ahead_predictive_log_loss + 
-                                        self.joint_log_probabilities + 
-                                        log_model_posteriors + 
-                                        np.log(1-cp_model.hazard_vector(1, t)))
-        except ValueError as v:
-            print(v)
-            print("log model posteriors:", log_model_posteriors)
-            print("log model posteriors shape:", log_model_posteriors.shape)
+        growth_log_probabilities = (predictive_log_probs + 
+                                    self.joint_log_probabilities + 
+                                    log_model_posteriors + 
+                                    np.log(1-cp_model.hazard_vector(1, t)))
         #Here, the hazard rate/r_t probability is contained in log_CP_evidence
-        CP_log_prob = self.r0_log_loss + np.log(model_prior) + log_CP_evidence
+        CP_log_prob = self.r0_log_prob + np.log(model_prior) + log_CP_evidence
         #print("r0_log_prob:", r0_log_prob)
         #print("CP log prob:", CP_log_prob)
         #print("groth probs:", growth_log_probabilities)
@@ -327,7 +130,6 @@ class ProbabilityModel:
         joint_log_probabilities_tm1 = self.joint_log_probabilities
         self.joint_log_probabilities = np.insert(growth_log_probabilities, 
                                                 0, CP_log_prob)
-        #print("self.joint_log_probabilities AFTER update", self.joint_log_probabilities)
         #print("self.joint_log_probabilities after update ", self.joint_log_probabilities.shape)
         
         """STEP 4: Lastly, we always want to get the new evidence for this
@@ -341,8 +143,13 @@ class ProbabilityModel:
         """STEP 5: If we want to optimize the hyperparameters, do so after
         all joint log probabilities, the evidence, and so on are updated"""
         if (self.hyperparameter_optimization is not None and 
-            self.hyperparameter_optimization is not False and
-            disable_hyperparameter_optimization is not True):
+            self.hyperparameter_optimization is not False):
+#            """STEP 5.0: Get the joint log probabilities P(y_1:t, r_t), 
+#            ignorning in particular the influence of the model m_t. This is 
+#            warranted for optimizing the hyper-parameters s.t. the data fits
+#            each individual model best"""
+#            self.model_specific_joint_log_probabilities = 
+#            CP_log_prob_2 = 
     
             """STEP 5.2: We have P(y_1:t, r_t, m_t = m), so if we sum over all
             tuples (m_t = m, r_t = r) for fixed m and variable r, what we get
@@ -355,10 +162,14 @@ class ProbabilityModel:
             derivative inside the individual model objects. Note that for the
             first observation (t = lag_length+1), the gradient of the pred
             log distr will just be that of the prior."""
-
-            """This returns log(d/dtheta loss(x)) and its signs"""
-            #DEBUG: This should be differentiated w.r.t. the probability, not
-            #       the loss!
+            #DEBUG: PROBLEM: IF THESE ARE ON LOG SCALE, THAT'S FINE, BUT THEY 
+            #       MUST NOT BE THE DERIVATIVE OF THE LOG OF THE PREDICTIVE!
+            #       i.e., we must not have d[log(f(x))] = f'(x)/f(x).
+            #       However, since log-expressions are more stable, just
+            #       use the log(f(x)) and then (1) log the result, (2)
+            #       use logsumexp to add f(x) to it (on log scale) to end up
+            #       with f'(x).
+            #DEBUG: Make sure this returns log(f'(x)) and its signs
             gradients_log_predictive_val, gradients_log_predictive_sign = (
                     self.differentiate_predictive_log_distribution(y,t, 
                     run_length_log_distro))
@@ -377,6 +188,8 @@ class ProbabilityModel:
             log(dP(y_t|y_1:t-1)) for all parameters over which we optimize."""
             #DEBUG: Need initialization of model_specific log probabilities derivative
             #       in some way.
+            #DEBUG: Unclear if nun_length_num is too large/too small for size
+            #       np.ones should have
             
             """STEP 5.4.1: joint log probs derivative (jlpd) parts 1 and 2 
             are obtained and combined to update the model specific joint
@@ -405,13 +218,20 @@ class ProbabilityModel:
             """Combine jlpd parts 1 and 2, store result in dP(r_t, y_1:t-1), 
             the gradient of the joint probabilities, as before the
             size is num_params x run_length_num"""
+#            print("jlpd_part1_val", jlpd_part1_val.shape)
+#            print("jlpd_part2_val", jlpd_part2_val.shape)
+#            print("jlpd_part1_sign", jlpd_part1_sign.shape)
+#            print("jlpd_part2_sign", jlpd_part2_sign.shape)
+#            print("gradients_log_predictive_val", gradients_log_predictive_val.shape)
+#            print("gradients_log_predictive_sign", gradients_log_predictive_sign.shape)
             res_val, res_sign = scipy.misc.logsumexp(
                 a = np.array([jlpd_part1_val, jlpd_part2_val]),
                 b = np.array([jlpd_part1_sign, jlpd_part2_sign]),
                 return_sign=True,
                 axis=0
                 )
-
+#            print("res_val", res_val.shape)
+#            print("res_sign", res_sign.shape)
             
             """So far, we have only computed the derivatives for non-CPs. 
             Next, we compute the derivative for a CP, using the recursion:
@@ -438,7 +258,7 @@ class ProbabilityModel:
                     a = np.array([
                          self.model_specific_joint_log_probabilities_derivative +
                          np.log(cp_model.hazard_vector(1,t)) + 
-                         self.one_step_ahead_predictive_log_probs                        
+                         self.one_step_ahead_predictive_log_probs                          
                     ]),
                     b = (
                       self.model_specific_joint_log_probabilities_derivative_sign),
@@ -456,129 +276,108 @@ class ProbabilityModel:
                     axis=1
                     )
             
-            
-
-
 
             
-            """STEP 6: Perform gradient descent step using caron's method"""
-            if (self.hyperparameter_optimization == "caron" or 
-                self.hyperparameter_optimization == "online"):
+            """Also compute the sum of the gradients for the model
+            specific joint probabilities over all run lengths, i.e.
+            sum(dP(r_t, y_1:t-1)) (quantity is needed as a 
+            constant in later computations), size is num_params x 1"""
+            #DEBUG: Only needed for Caron's method
+#            sum_jlpd_gradients_val, sum_jlpd_gradients_sign = (
+#                scipy.misc.logsumexp(
+#                a = self.model_specific_joint_log_probabilities_derivative,
+#                b = self.model_specific_joint_log_probabilities_derivative_sign,
+#                return_sign=True,
+#                axis=1)
+#                )
                 
-                """STEP 6.1: Get sum of the model specific joint log prob
-                derivatives, i.e. sum_{r \in R(t)} d/dtheta P(r_t, y_1:t|m_t)"""
-                joint_log_der_sum, joint_log_der_sum_signs = (
-                    scipy.misc.logsumexp(
-                    a=(self.model_specific_joint_log_probabilities_derivative),
-                    b=self.model_specific_joint_log_probabilities_derivative_sign,
-                    return_sign=True, axis=1))
-                """STEP 6.2: Get the two parts needed for computing the 
-                derivative of P(r_t|y_1:t, m_t) w.r.t. theta"""
-                log_evidence = scipy.misc.logsumexp(model_specific_joint_log_probs)
-                part1 = (self.model_specific_joint_log_probabilities_derivative
-                         - log_evidence)
-                part2 = (joint_log_probabilities_tm1 - 2*log_evidence + 
-                         joint_log_der_sum[:, np.newaxis])
-                """STEP 6.3: add them together with appropriate sign to compute
-                the desired quantity, d/dtheta P(r_t|y_1:t, m_t). Note that we
-                flip the sign of the second quantity, as it is subtracted"""
-                #DEBUG: need to stretch signs of joint log der sums !
-                rld_der_signs, rld_der = scipy.misc.logsumexp(
-                    a = np.array([part1, part2]),
-                    b = np.array([
-                    self.model_specific_joint_log_probabilities_derivative_sign,
-                    (-1) * joint_log_der_sum_signs[:,np.newaxis] * 
-                        np.ones((num_params, run_length_num))]),
-                    return_sign = True, axis = 0)
-                """STEP 6.4: Finally, compute the gradient of P(Y_t|Y_1:t-1) 
-                using all of the previous computations"""
-
-                """NOTE: In this computation, we compute P(Y_t|Y_1:t-1), so the
-                retained run-lengths are r_t-1, which means in particular that
-                we do NOT allow a CP at time t. (Thus, we only take the 1: 
-                entries of gradients_log_predictive_val and do not use 
-                the CP-probability of the predictives!)"""
-#                print("gradients_log_predictive_val[:,1:]", gradients_log_predictive_val[:,1:].shape)
-#                print("run_length_log_distro", run_length_log_distro.shape)
-#                print("rld_der", rld_der.shape)
-#                print("self.one_step_ahead_predictive_log_probs[:,np.newaxis]", self.one_step_ahead_predictive_log_probs[:,np.newaxis].shape)
-                gradient, gradient_signs = scipy.misc.logsumexp(
-                    a = np.array([
-                        gradients_log_predictive_val[:,1:] + 
-                            run_length_log_distro[np.newaxis,:],
-                        self.one_step_ahead_predictive_log_probs[np.newaxis,:] + 
-                            rld_der]),
-                    b = np.array([
-                        gradients_log_predictive_sign[:,1:],
-                        rld_der_signs]),
-                    return_sign = True,
-                    axis = (0,2))
-    
-                """STEP 6.5: We now also need to compute the not-derivative of
-                P(Y_t|Y_1:t-1), since what we really want is 
-                d/dtheta{log(P(Y_t|Y_1:t-1))} = 
-                    d/dtheta{P(Y_t|Y_1:t-1)}/P(Y_t|Y_1:t-1)"""
-                pred = scipy.misc.logsumexp(
-                        self.one_step_ahead_predictive_log_probs + 
-                        run_length_log_distro)
-                
-                #make sure that we are not making infinitely large steps
-                grad = np.nan_to_num(np.exp(gradient-pred))
-                sig  = np.nan_to_num(gradient_signs)
-                #nans occur due to overflow in the exponential, so just make them
-                #a large number!
-                #new_grad = raw_grad
-                #new_grad[np.isnan(raw_grad)] = pow(10,5) + 0.001
-                grad[grad == 0] = pow(10,5)
-                caron_gradient = np.minimum((grad),
-                                pow(10,5)*np.ones(num_params))*sig 
-#                print(pred)
-#                print(gradient)
-#                print(gradient)
-#                print(gradient_signs)
-#                print(grad)
-#                print(caron_gradient)
-                
-                """STEP 6.5: Call the optimization routine that you selected
-                for this model. 'increment' is a num_params x 1 vector that 
-                gives direction for each hyperparameter"""
-                p, C, scale = 1.0005, 1000, 3 #Nile: 1.005, 1
-                step_size = self.step_caron_pow2(t, p, C, scale)
-                #increment = step_size * caron_gradient
-                self.caron_hyperparameter_optimization(t, caron_gradient, 
-                                                       step_size)
-                
-#                sign, caron_gradient = scipy.misc.logsumexp(
-#                    a=(self.model_specific_joint_log_probabilities_derivative),
-#                    b=self.model_specific_joint_log_probabilities_derivative_sign,
-#                    return_sign=True, axis=1)
-#                
-#                """Notice: What we use here is that denoting by theta_1:t the
-#                sequence of hyperparams used at times 1:t, the derivative
-#                d/dtheta_t P(y_t|y_1:t-1) = d/dtheta_t {P(y_1:t)/P(y:1:t-1)}, 
-#                and moreover P(y:1:t-1) does not depend on theta_t! So
-#                d/dtheta_t P(y_1:t)/P(y_1:t-1)=d/dtheta_t{P(y_1:t)}/P(y_1:t-1),
-#                which means that in log-scale, we have
-#                log(d/dtheta_tP(y_t|y:1:t-1)) = log(d/dtheta_t{P(y_1:t)}) -
-#                                                log(P(y_1:t-1))"""
-#                #DEBUG: This only works if we do NOT use generalized Bayes!
-#                #       Fix this.
-#                caron_gradient = np.exp(caron_gradient)*sign - log_evidence
-#                
-#                """STEP 5.5: Call the optimization routine that you selected
-#                for this model. 'increment' is a num_params x 1 vector that gives
-#                the direction for each hyperparameter"""
-#                p, C, scale = 1.0005, 1000, 3 #Nile: 1.005, 1
-#                step_size = self.step_caron_pow2(t, p, C, scale)
-#                #increment = step_size * caron_gradient
-#                self.caron_hyperparameter_optimization(t, caron_gradient, 
-#                                                       step_size)
-                
-            """STEP 7: Update the derivatives of the joint log probs. The sum
+            """STEP 5.4.2: Compute logs of Q1, Q2, Q3 to finally obtain the 
+            desired num_params x 1 vector log(dP(y_t|y_1:t-1)). Define
+            Q1 = 1/P(y_t|y_1:t-1) * sum[dP(y_t|y_1:t-1, r_t) * P(r_t|y_1:t-1)], 
+            Q2 = 1/P(y_t|y_1:t-1)*1/sum(P(r_t, y_1:t-1)) * 
+                     sum(P(y_t|y_1:t-1, r_t)*dP(r_t, y_1:t-1)
+            Q3 = 1/P(y_t|y_1:t-1)*[1/sum(P(r_t, y_1:t-1))]^2*
+                    [sum(dP(r_t, y_1:t-1))] * 
+                    sum(P(y_t|y_1:t-1, r_t)*P(r_t, y_1:t-1)).
+            All Q1, Q2, Q3 have size num_params x 1."""
+            #DEBUG: Only needed for Caron's method.
+            
+#            """Compute P(y_t|y_1:t-1) in log form. Notice that the case that
+#            the last CP was at t-1 is the latest we take into account, since
+#            the RLD used is P(r_t-1|y_1:t-1)"""
+#            log_predictive = scipy.misc.logsumexp(
+#                    self.one_step_ahead_predictive_log_probs +
+#                    run_length_log_distro
+#                )
+#            """Compute P(y:1_t-1|m_t=m)"""
+#            log_evidence = scipy.misc.logsumexp(model_specific_joint_log_probs)
+            
+            """Q1 = 1/P(y_t|y_1:t-1) * sum[dP(y_t|y_1:t-1, r_t) * 
+                    P(r_t|y_1:t-1)]"""
+            #DEBUG: Unclear if run length log distro is as long as gradients
+#            print("gradients", gradients_log_predictive_val.shape)
+#            print("run length distro", run_length_log_distro.shape)
+#            Q1, sign1 = -log_predictive + scipy.misc.logsumexp(
+#                    a = (gradients_log_predictive_val[:,1:] +
+#                        run_length_log_distro),
+#                    b = gradients_log_predictive_sign[:,1:],
+#                    return_sign=True,
+#                    axis=1
+#                )
+            
+#            """Q2 = 1/P(y_t|y_1:t-1)*1/sum(P(r_t, y_1:t-1)) * 
+#                     sum(P(y_t|y_1:t-1, r_t)*dP(r_t, y_1:t-1)"""
+#            Q2, sign2 = -log_predictive - log_evidence + scipy.misc.logsumexp(
+#                a = np.array(self.model_specific_joint_log_probabilities_derivative+
+#                    self.one_step_ahead_predictive_log_probs.reshape(
+#                            run_length_num)),
+#                b = self.model_specific_joint_log_probabilities_derivative_sign,
+#                return_sign=True,
+#                axis=1
+#                )
+            
+#            """Q3 = 1/P(y_t|y_1:t-1)*[1/sum(P(r_t, y_1:t-1))]^2*
+#                    [sum(dP(r_t, y_1:t-1))] * 
+#                    sum(P(y_t|y_1:t-1, r_t)*P(r_t, y_1:t-1)).
+#                    NOTE: sign3 = (-1)*sum_jlpd_gradients_sign because Q3 is
+#                          subtracted, i.e. Q = Q1 + Q2 - Q3. By changing the
+#                          sign to -1, we obtain Q = Q1+Q2+Q3."""
+##            print("sum_jlpd_gradients_val", sum_jlpd_gradients_val.shape )
+#            Q3 = (-log_predictive -2*log_evidence + 
+#                         sum_jlpd_gradients_val+
+#                         scipy.misc.logsumexp(
+#                            a = model_specific_joint_log_probs+
+#                                self.one_step_ahead_predictive_log_probs.
+#                                reshape(run_length_num))
+#                            ) 
+#            sign3 = (-1)*sum_jlpd_gradients_sign
+            
+#            print("Q1", Q1.shape)
+#            print("Q2", Q2.shape)
+#            print("Q3", Q3.shape)
+#            print("sign1", sign1.shape)
+#            print("sign2", sign2.shape)
+#            print("sign3", sign3.shape)
+#            """Get Q and its sign, and finally convert from log-format"""
+#            Q, sign = scipy.misc.logsumexp(
+#                a=np.array([Q1.reshape(num_params), Q2.reshape(num_params),
+#                    Q3.reshape(num_params)]), 
+#                b=np.array([sign1.reshape(num_params), 
+#                    sign2.reshape(num_params), sign3.reshape(num_params)]),
+#                return_sign=True,
+#                axis=0)
+            
+            """STEP 6: Update the derivatives of the joint log probs. The sum
             of these quantities is d/dtheta P(y_1:t), i.e. the gradient for the
             method of Turner et al. Needs to be done this late because the
             d/dtheta P(r_t-1, y_1:t-1) needed for Caron's gradient descent"""
-            
+#            print("gradients_log_predictive_val", 
+#                  gradients_log_predictive_val.shape)
+#            print("self.gradients_log_predictive_sign", 
+#                  gradients_log_predictive_sign.shape)
+#            print("CP_grad_val_1", CP_grad_1_val.shape)
+#            print("CP_grad_val_2", CP_grad_2_val.shape)
+#            print("CP_grad_val", CP_grad_val.shape)
             """Compute P(y:1_t-1|m_t=m)"""
             log_evidence = scipy.misc.logsumexp(model_specific_joint_log_probs)
             """Update derivatives"""
@@ -586,94 +385,49 @@ class ProbabilityModel:
                     res_val, 0, CP_grad_val, axis=1)
             self.model_specific_joint_log_probabilities_derivative_sign = (
                     np.insert(res_sign, 0, CP_grad_sign, axis=1))
+            
+#            print("Q", Q)
+#            print("sign", sign)
+#            caron_gradient = sign*np.exp(Q)
+            #DEBUG: Check if caron_gradient can be computed more easily as
+            #       Turner's gradient, i.e. by summing up the model specific 
+            #       lob probs!
+            
+            #DEBUG: ONLY do this if we have caron's method, since we
+            #       might want to have hyperparameter-opt, but with Turner's
+            #       method.
+            if (self.hyperparameter_optimization == "caron" or 
+                self.hyperparameter_optimization == "online"):
+                sign, caron_gradient = scipy.misc.logsumexp(
+                    a=(self.model_specific_joint_log_probabilities_derivative),
+                    b=self.model_specific_joint_log_probabilities_derivative_sign,
+                    return_sign=True, axis=1)
+                
+                """Notice: What we use here is that denoting by theta_1:t the
+                sequence of hyperparams used at times 1:t, the derivative
+                d/dtheta_t P(y_t|y_1:t-1) = d/dtheta_t {P(y_1:t)/P(y:1:t-1)}, 
+                and moreover P(y:1:t-1) does not depend on theta_t! So
+                d/dtheta_t P(y_1:t)/P(y_1:t-1)=d/dtheta_t{P(y_1:t)}/P(y_1:t-1),
+                which means that in log-scale, we have
+                log(d/dtheta_tP(y_t|y:1:t-1)) = log(d/dtheta_t{P(y_1:t)}) -
+                                                log(P(y_1:t-1))"""
+                caron_gradient = np.exp(caron_gradient)*sign - log_evidence
+                
+                """STEP 5.5: Call the optimization routine that you selected
+                for this model. 'increment' is a num_params x 1 vector that gives
+                the direction for each hyperparameter"""
+                p, C, scale = 1.0005, 1000, 3 #Nile: 1.005, 1
+                step_size = self.step_caron_pow2(t, p, C, scale)
+                #increment = step_size * caron_gradient
+                self.caron_hyperparameter_optimization(t, caron_gradient, 
+                                                       step_size)
+            
 
-    
-
-    def update_alpha_derivatives(self, y, t,
-                                 log_model_posteriors,
-                                 log_model_posteriors_der, 
-                                 log_model_posteriors_der_sign,
-                                 log_CP_evidence, 
-                                 log_CP_evidence_der, 
-                                 log_CP_evidence_der_sign,
-                                 model_prior,
-                                 cp_model):
-        """Uses recursive updates to obtain the derivatives of the joint 
-        probabilities w.r.t. alpha. 
-        NOTE: Do the computations in log-form, and then convert back       
-        log_model_posteriors: P(m_t|m_t-1, r_t-1, y_1:t-1)
-        log_model_posteriors_der: derivative w.r.t. alpha, computed in Detector
-        log_CP_evidence: sum(r_t-1) sum(m_t-1) P(m_t-1, r_t-1, y_1:t-1)
-        log_CP_evidence_der: derivative w.r.t. alpha, computed in Detector
-        model_prior: q(m)
-        cp_model: probability_cp_model object, passed in by Detector
-        """
-        
-        #DEBUG: Initialize the alpha-derivatives to 0 in initiatlization.
-        #DEBUG: Put this into the probability_model, since it will be 
-        #       the same for any model!
-        
-        """STEP 1: We need expressions that are derivatives w.r.t. alpha, 
-            (1) one-step-ahead predictive loss' derivative 
-            (2) conditional model posterior's derivative [passed in]"""
-        _1, _2 = (
-            self.get_one_step_ahead_log_loss_derivatives_power_divergence())
-        one_step_ahead_log_loss_derivatives = _1 
-        one_step_ahead_log_loss_derivatives_sign = _2
-        
-        """STEP 2: Get the expressions that are NOT derivatives w.r.t. alpha.
-        Note that the entire derivative can be written as
-            d/dalpha P(y_1:t, r_t, m_t) = d/dalpha{P(y_1:t-1, r_t-1, m_t-1)} * 
-                rest_1 + d/dalpha{P(y_t|r_t, m_t, y_1:t-1) * rest_2 + 
-                d/dalpha P(m_t|m_t-1, r_t, y_1:t-1) * rest_3}
-        """
-        #DEBUG: joint log probs also massive! 10^4 to 10^13 iin log form !!!
-        #DEBUG: one-step-ahead predictive log loss around 200 in log form!
-        #DEBUG: log model posterior derivatives are of order 10^5 - 10^15 in log.
-        full = (self.one_step_ahead_predictive_log_loss + 
-                self.joint_log_probabilities + 
-                log_model_posteriors + 
-                np.log(1-cp_model.hazard_vector(1, t)))
-        rest_1 = full - self.joint_log_probabilities
-        rest_2 = full - self.one_step_ahead_predictive_log_loss
-        rest_3 = full - log_model_posteriors
-
-        
-        """STEP 3: Combine the expressions that are and are not derivatives 
-        w.r.t. alpha to update the logs of the derivatives of the joint log
-        probabilities w.r.t. alpha. 
-        NOTE: These are the growth-probability updates!
-        """
-        new_derivatives, new_derivatives_sign = scipy.misc.logsumexp(
-                a = np.array([
-                    rest_1 + self.log_alpha_derivatives_joint_probabilities, 
-                    rest_2 + one_step_ahead_log_loss_derivatives[1:],
-                    rest_3 + log_model_posteriors_der
-                    ]),
-                b = np.array([
-                    self.log_alpha_derivatives_joint_probabilities_sign,
-                    one_step_ahead_log_loss_derivatives_sign[1:],
-                    log_model_posteriors_der_sign
-                        ]),
-                return_sign = True,
-                axis = 0
-            )
-        
-        """STEP 4: Get the CP-probability derivative"""
-        CP_d_1 = (one_step_ahead_log_loss_derivatives[0] + np.log(model_prior) + 
-                  log_CP_evidence)
-        CP_d_2 = (self.r0_log_loss + np.log(model_prior) + log_CP_evidence_der)
-        CP_derivative, CP_derivative_sign = scipy.misc.logsumexp(
-            a=np.array([CP_d_1, CP_d_2]),
-            b = np.array([one_step_ahead_log_loss_derivatives_sign[0], 
-                          log_CP_evidence_der_sign]),
-            return_sign = True)
-        
-        self.log_alpha_derivatives_joint_probabilities = np.insert(
-                new_derivatives, 0, CP_derivative)
-        self.log_alpha_derivatives_joint_probabilities_sign = np.insert(
-                new_derivatives_sign,0,CP_derivative_sign)
-        
+#            print("self.model_specific_joint_log_probabilities_derivative", 
+#                  self.model_specific_joint_log_probabilities_derivative.shape)
+#            print("self.model_specific_joint_log_probabilities_derivative_sign", 
+#                  self.model_specific_joint_log_probabilities_derivative_sign.shape)
+            
             
     #@staticmethod
     def step_caron_pow2(self,t, p, C,scale):
@@ -803,152 +557,8 @@ class ProbabilityModel:
                 self.trimmer(kept_run_lengths)
     
     
-    def alpha_param_gradient_computation(self, y, t, cp_model,
-                         model_prior,
-                         log_model_posteriors,
-                         log_CP_evidence, eps ):
-        """empty function that does nothing. If the relevant model class is 
-        using the DPD loss, this relevant model class extends the function
-        and performs an update on alpha_param"""
-        pass
     
     
-    def DPD_joint_log_prob_updater(self, 
-                alpha_direction, y, t, cp_model, model_prior, 
-                log_model_posteriors,  log_CP_evidence):
-        """called inside DPD_alpha_update for those classes that implement 
-        DPD"""
-        
-#        """STEP 1: Discern direction of alpha-deviation (i.e., whether we have
-#        alpha + eps or alpha - eps)"""
-#        if alpha_direction > 0:
-        
-        #DEBUG: I think the if statment is not needed, as the 'direction' is 
-        #       directly passed on to evaluate_pred_log_distr, and not relevant
-        #       anywhere else!
-        """STEP 1A: If we want alpha + eps, compute accordingly"""
-        r0_log_prob = self.evaluate_log_prior_predictive(y,t, 
-                            store_posterior_predictive_quantities = False)
-         #IMPLEMENT: Needs to be adapted s.t. I can get evaluations for
-        #           the different sets of parameters (i.e. L_rt_p_eps etc)
-        one_step_ahead_predictive_log_probs = (
-                self.evaluate_predictive_log_distribution(y,t,
-                            store_posterior_predictive_quantities = False,
-                            alpha_direction = alpha_direction))
-
-        if self.generalized_bayes_rld == "power_divergence":
-            
-            """Note: The alpha we use here is the RLD-alpha, so we don't 
-            need to adjust it for alpha + eps or alpha - eps"""
-            #print("DPD")
-            #DEBUG: Problem with length mismatch between joint log probs
-            #       and the integrals (log probs 1 unit longer!)
-            #Q: Is that because we basically have no influence of alpha on
-            #   r = 0, i.e. we should really just look at the 
-            #NOTE: Atm, we fix this by inserting the prior log det again in
-            #       the first position, but this is not correct
-            integrals = self.get_log_integrals_power_divergence(DPD_call=True)
-            
-            
-            #DEBUG: Check if np.log(maxFloat) >= any value in integrals.
-            max_val = np.log(np.finfo(np.float64).max)
-            #Split integral term s.t. you set terms exceeding max_val to max_val
-            #and leave the rest. Similarly for the one step ahead pred.
-            
-            
-            """STEP 1: Correct the integral term by bounding"""
-            integral_exceeds = np.where(integrals >= max_val)[0]
-            integral_fine = np.where(integrals < max_val)[0]
-            integral_exp = integrals
-            
-            if len(integral_exceeds)>0:
-                integral_exp[integral_exceeds] = (
-                        min(1.0,(1.0/(self.alpha_rld+1)))*
-                        (np.finfo(np.float64).max)
-                )
-            if len(integral_fine)>0:
-                """Just do the standard thing"""
-                integral_exp[integral_fine] = (
-                        min(1.0,(1.0/(self.alpha_rld+1)))*
-                         np.exp(integrals[integral_fine])
-                    )
-            
-            """STEP 2: Correct the predictive probs"""
-            
-            """STEP 2.1: Correct CP prob if necessary"""
-            if self.r0_log_prob >= max_val:
-                r0_log_prob_exp = (min(1.0, 1.0/self.alpha_rld) * 
-                                   (min(self.alpha_rld, 1) * max_val))
-            else:
-                r0_log_prob_exp = (1.0/self.alpha_rld*np.exp(
-                    r0_log_prob*self.alpha_rld))
-            
-            """STEP 2.2: Correct other probs"""
-            step_ahead_exceeds = np.where(
-                    one_step_ahead_predictive_log_probs >= max_val)[0]
-            step_ahead_fine = np.where(
-                    one_step_ahead_predictive_log_probs < max_val)[0]
-            step_ahead_exp = one_step_ahead_predictive_log_probs
-            if len(step_ahead_exceeds)>0:
-                if self.alpha_rld < 1:
-                    """If the max value will be downweighted by alpha"""
-                    step_ahead_exp[step_ahead_exceeds] = (
-                            min(1.0,1.0/(self.alpha_rld))*
-                            (np.finfo(np.float64).max * self.alpha_rld)
-                    )
-                else:
-                    """If the max value will be increased by alpha"""
-                    step_ahead_exp[step_ahead_exceeds] = (
-                            min(1.0,(1.0/(self.alpha_rld)))*
-                            (np.finfo(np.float64).max)
-                    )
-            if len(step_ahead_fine)>0:
-                """Just do the standard thing"""
-                step_ahead_exp[step_ahead_fine] = (
-                        ((1.0/(self.alpha_rld+1))*
-                         np.exp(
-                            one_step_ahead_predictive_log_probs[
-                                    step_ahead_fine]*
-                            self.alpha_rld)
-                    ))
-                        
-            one_step_ahead_predictive_log_probs = (
-                    step_ahead_exp - integral_exp[1:])
-            r0_log_prob = r0_log_prob_exp - integral_exp[0]
-            
-            
-            
-            
-            """Note: If we have the power divergence loss, then our log of 
-            the loss should be computed from the predictive probabilities 
-            appropriately"""
-            #DEBUG: Original/numerically unstable version
-#            one_step_ahead_predictive_log_probs = (1.0/self.alpha_rld*
-#                    np.power(np.exp(one_step_ahead_predictive_log_probs), 
-#                         self.alpha_rld) - 
-#                    (1.0/(self.alpha_rld+1.0))*np.exp(integrals[1:])
-#                )
-#            r0_log_prob = (1.0/self.alpha_rld*np.power(np.exp(r0_log_prob), 
-#                                                       self.alpha_rld) 
-#                - (1.0/(self.alpha_rld+1.0))*np.exp(integrals[0]))
-
-        
-        """STEP 2: update all no-CP joint probabilities, so-called 'growth 
-        probabilities' to follow MacKay's naming convention. There will be t
-        of them, namely for r=1,2,...,t-1, > t-1, with the last probability
-        always being 0 unless we have boundary conditions allowing for
-        non-zero probability that we are already in the middle of a segment
-        at the first observation."""
-        growth_log_probabilities = (one_step_ahead_predictive_log_probs + 
-                                    self.joint_log_probabilities + 
-                                    log_model_posteriors + 
-                                    np.log(1-cp_model.hazard_vector(1, t)))
-        CP_log_prob = r0_log_prob + np.log(model_prior) + log_CP_evidence
-        joint_log_probabilities = np.insert(growth_log_probabilities, 
-                                                0, CP_log_prob)
-        
-        return joint_log_probabilities
-        
     
     
     
