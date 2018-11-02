@@ -61,7 +61,7 @@ if __name__ == "__main__":
     nile_file = os.path.join(baseline_working_directory, "Data", "nile.txt")
     T, S1, S2, river_height, __, __ = load_nile_data(nile_file)     # Use standardised river height
 
-    """STEP 2: Set up initial hyperparameters (will be optimized throughout 
+    """STEP 2: Set up initial hyperparameters (will be optimized throughout
     the algorithm) and lag lengths"""
 
     #  Set up the parser
@@ -111,8 +111,8 @@ if __name__ == "__main__":
     model_universe = np.array(AR_models)
     model_prior = np.array([1 / len(model_universe)] * len(model_universe))
 
-    """STEP 5: Build and run detector, i.e. the object responsible for executing 
-    BOCPDMS with multiple (previously specified) models for the segments and a 
+    """STEP 5: Build and run detector, i.e. the object responsible for executing
+    BOCPDMS with multiple (previously specified) models for the segments and a
     CP model specified by cp_model"""
     detector = Detector(
         data=river_height,
@@ -123,14 +123,7 @@ if __name__ == "__main__":
         store_rl=True, store_mrl=True,
         trim_type="keep_K", threshold=50,
         notifications=50,
-        save_performance_indicators=True,
-        generalized_bayes_rld="kullback_leibler",
-        alpha_param_learning="individual",
-        alpha_param=0.01,
-        alpha_param_opt_t=30,
-        alpha_rld_learning=True,
-        loss_der_rld_learning="squared_loss",
-        loss_param_learning="squared_loss")
+        save_performance_indicators=True)
     detector.run()
 
     """STEP 6: Store results into EvaluationTool object with plotting capability"""
@@ -152,7 +145,7 @@ if __name__ == "__main__":
                     format="pdf", dpi=800)
         plt.cla()
 
-    """STEP 8: Also plot some performance indicators (will usually be printed 
+    """STEP 8: Also plot some performance indicators (will usually be printed
     to the console before the plots)"""
     print("\nCPs are ", detector.CPs[-2])
     print("\n***** Predictive MSE + NLL from Table 1 in ICML 2018 paper *****")
