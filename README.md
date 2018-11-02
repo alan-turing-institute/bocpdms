@@ -1,6 +1,7 @@
+
 # BOCPDMS: Bayesian On-line Changepoint Detection with Model Selection
 
-[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/alan-turing-institute/bocpdms/master)
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/alan-turing-institute/bocpdms/master?filepath=examples%2FNile.ipynb)
 
 This repository contains code from the _Bayesian On-line Changepoint Detection with Model Selection_ project.
 
