@@ -8,11 +8,9 @@ This repository contains code from the _Bayesian On-line Changepoint Detection w
 ## Table of contents
 
 * [About BOCPDMS](#about-bocpdms)
-* [Citing this project](#citing-this-project)
+* [Reproducible Research Champions](#reproducible-research-champions)
 * [Installation instructions](#installation-instructions)
 * [Running the examples](#running-the-examples)
-* [Reproducible research champions program](#reproducible-research-champions-program)
-* [Contributors](#contributors)
 
 
 ## About BOCPDMS
@@ -30,6 +28,12 @@ Bayesian On-line Changepoint Detection (BOCPD) is a discrete-time inference fram
 ¹Jeremias Knoblauch and Theodoros Damoulas. [Spatio-temporal Bayesian On-line Changepoint Detection](https://arxiv.org/abs/1805.05383), _International Conference on Machine Learning_ (2018).
 
 ²Jeremias Knoblauch, Jack Jewson and Theodoros Damoulas. [Doubly Robust Bayesian Inference for Non-Stationary Streaming Data with β-Divergences](https://arxiv.org/abs/1806.02261), arXiv:1806.02261 (2018).
+
+### Code
+
+The code in this repository was used in both papers, and we are currently working on splitting the two projects so that it is easier to reproduce the work in both the older¹ and newer² papers. You can track our progress on this in [issue \#14](https://github.com/alan-turing-institute/bocpdms/issues/14).
+
+Until we close \#14, you may notice that the results from some of the examples are _robust_, but do not exactly _reproduce_ those from the ICML paper. This is due to changes in the core classes, and in particular the hyperparameter optimisation process, between the publication of the two papers.
 
 ## Reproducible Research Champions
 
@@ -130,3 +134,32 @@ tests\test_nile_example.py .                                             [100%]
 
 ========================== 6 passed in 17.83 seconds ==========================
 ```
+
+
+## Running the examples
+
+You can jump directly to an interactive demo of the Nile example by clicking on this Binder button:
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/alan-turing-institute/bocpdms/master?filepath=examples%2FNile.ipynb)
+
+To run from the command line, first activate your virtual environment as described above. You can then run, for example,
+```
+python nile_ICML18.py
+```
+and
+```
+python paper_pictures_nileData.py
+```
+to generate the figure(s). Recently we have started to add further options that let you change various parameters from the command line. These are currently available for the Nile river height and bee waggle dance examples (although you can find this functionality for some of the other scripts in their respective [branches](https://github.com/alan-turing-institute/bocpdms/branches)). You can see the various options with the following commands:
+```
+python nile_ICML18.py --help
+python bee_waggle_ICML18.py --help
+```
+
+## Contributors
+
+Thank you to the following for their contributions to this project:
+- Jeremias Knoblauch
+- Theo Damoulas
+- Kirstie Whitaker
+- Martin O'Reilly
+- Louise Bowler
