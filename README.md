@@ -1,4 +1,3 @@
-
 # BOCPDMS: Bayesian On-line Changepoint Detection with Model Selection
 
 [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/alan-turing-institute/bocpdms/master?filepath=examples%2FNile.ipynb)
@@ -11,6 +10,7 @@ This repository contains code from the _Bayesian On-line Changepoint Detection w
 * [Reproducible Research Champions](#reproducible-research-champions)
 * [Installation instructions](#installation-instructions)
 * [Running the examples](#running-the-examples)
+* [Contributors](#contributors)
 
 
 ## About BOCPDMS
@@ -33,7 +33,9 @@ Bayesian On-line Changepoint Detection (BOCPD) is a discrete-time inference fram
 
 The code in this repository was used in both papers, and we are currently working on splitting the two projects so that it is easier to reproduce the work in both the older¹ and newer² papers. You can track our progress on this in [issue \#14](https://github.com/alan-turing-institute/bocpdms/issues/14).
 
-Until we close \#14, you may notice that the results from some of the examples are _robust_, but do not exactly _reproduce_ those from the ICML paper. This is due to changes in the core classes, and in particular the hyperparameter optimisation process, between the publication of the two papers.
+Until we close \#14, you may notice that the results from some of the examples are _robust_, but do not exactly _reproduce_ those from the earlier ICML paper. This is due to changes in the core classes, and in particular the hyperparameter optimisation process, between the publication of the two papers.
+
+Want a preview of the ICML results? Take a look at the updated demo in the branch associated with issue \#14 on Binder: [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/alan-turing-institute/bocpdms/feature/14-remove-nips?filepath=examples%2FNile.ipynb)
 
 ## Reproducible Research Champions
 
@@ -149,7 +151,7 @@ and
 ```
 python paper_pictures_nileData.py
 ```
-to generate the figure(s). Recently we have started to add further options that let you change various parameters from the command line. These are currently available for the Nile river height and bee waggle dance examples (although you can find this functionality for some of the other scripts in their respective [branches](https://github.com/alan-turing-institute/bocpdms/branches)). You can see the various options with the following commands:
+to generate the figure(s). Recently, we have started to add further options that let you change various parameters from the command line. These are currently available for the Nile river height and bee waggle dance examples (although you can find this functionality for some of the other scripts in their respective [branches](https://github.com/alan-turing-institute/bocpdms/branches)). You can see the various options with the following commands:
 ```
 python nile_ICML18.py --help
 python bee_waggle_ICML18.py --help
