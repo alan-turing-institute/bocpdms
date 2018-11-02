@@ -15,9 +15,8 @@ import numpy as np
 import scipy
 from scipy import misc
 import time
-
-from BVAR_NIG_DPD import BVARNIGDPD
-from BVAR_NIG import BVARNIG
+#from BVAR_NIG import BVARNIG
+#from BVAR_NIG_QR import BVARNIG_QR
 
 class Detector:
     """key object in the Spatial BOCD
@@ -68,20 +67,7 @@ class Detector:
                  store_rl = False, store_mrl = False, trim_type = "keep_K",
                  notifications = 50,
                  save_performance_indicators=False,
-                 training_period = 200,
-                 generalized_bayes_rld = False, #'kullback_leibler', 'power_divergence'
-                 alpha_rld = None,
-                 alpha_rld_learning = False,
-                 alpha_param_learning = False,
-                 alpha_param = None,
-                 #SGD-updating of alpha_param and alpha_rld in case we use DPD
-                 loss_der_rld_learning = None,
-                 loss_param_learning = None,
-                 step_size_rld_learning = None,
-                 step_size_param_learning = None,
-                 eps_param_learning = None,
-                 alpha_param_opt_t=100,
-                 alpha_rld_opt_t = 100):
+                 training_period = 200):
         #add arguments: save_negative_log_likelihood, training_period
         """construct the Detector with the multi-dimensional numpy array 
         *data*. E.g., if you have a SxS spatial lattice with T time points,
@@ -94,9 +80,7 @@ class Detector:
         object of class CpModel that stores all properties about the CP prior, 
         i.e. the probability of one occuring at every time point.        
         """
-        #DEBUG: initialize correctly
-        self.gradient = 0.0
-
+        
         """store the inputs into object"""
         self.data = data.reshape(T, S1*S2)
         self.model_universe = model_universe 
@@ -120,7 +104,6 @@ class Detector:
         self.negative_log_likelihood = []
         self.negative_log_likelihood_fixed_pars = []
         self.MSE = []
-        self.MAE = []
         
         """Take care of exogeneous variables"""
         #DEBUG: At this point, assumes that we have an obs. for each location
@@ -159,7 +142,7 @@ class Detector:
         self.MAP_segmentation = [np.array([[],[]])]
         #self.segment_log_densities = np.zeros(shape = (self.Q, self.T) )
         
-        """store the smallest & largest lag length"""
+        """store the smallest lag length"""
         self.smallest_lag_length = 99999
         for model in self.model_universe:
             if model.has_lags:
@@ -167,111 +150,6 @@ class Detector:
                                                model.lag_length)
             else:
                 self.smallest_lag_length = 0
-        self.max_lag_length = 0
-        for model in self.model_universe:
-            if model.has_lags:
-                self.max_lag_length = max(self.max_lag_length, 
-                                               model.lag_length)
-        
-        """STEP 3: If we are in a generalized Bayes setting, modify each model 
-        object accordingly"""
-        
-        """STEP 3.1: If we use DPD for parameter inference and we want to 
-        optimize the alpha paramter across all models, set the initial value
-        of alpha_param using either detector-input or the first model's val"""
-        self.alpha_param_learning = alpha_param_learning
-        if ((alpha_param is not None) and alpha_param_learning == "together"):
-            self.alpha_param = alpha_param
-            self.gradient_alpha_param_count = 0
-            self.gradient_alpha_param = 0
-        elif alpha_param_learning == "together":
-            self.alpha_param = self.model_universe[0].alpha_param
-            self.gradient_alpha_param_count = 0
-            self.gradient_alpha_param = 0
-            print("WARNING! You are using DPD for parameter inference " + 
-                  "and want to optimize alpha_param across all models, " +
-                  "but you have not specified an initial value in the " +
-                  "detector object. The alpha_param of the first " + 
-                  "model in the model universe was chosen instead")
-        
-        """STEP 3.2: Set whether we do alpha_param learning inside models. 
-        Next, set alpha_param for all models that are DPD in case we do 
-        joint optimization across all models. """
-        if ((alpha_param_learning == "individual") or 
-             alpha_param_learning == "together"):     
-            if alpha_param_learning == "individual":
-                self.gradient_alpha_param_count = np.zeros(self.Q)
-                self.gradient_alpha_param = np.zeros(self.Q)
-            """Set the alpha_param learning attribute for DPD models"""
-            for model in self.model_universe:
-                if isinstance(model, BVARNIGDPD):
-                    model.alpha_param_learning = True
-                    """Set the initial alpha_param value. This ensures that 
-                    the optimization step makes sense."""
-                    if alpha_param_learning == "together":
-                        model.alpha_param = self.alpha_param
-                        
-        self.alpha_param_opt_t = alpha_param_opt_t
-        self.alpha_rld_opt_t = alpha_rld_opt_t
-        self.alpha_opt_count = 0
-               
-        """STEP 3.3: Set all phantities relating to Run-length distribution
-        robustification using DPD"""
-        self.alpha_rld_learning = alpha_rld_learning
-        self.generalized_bayes_rld = generalized_bayes_rld
-        self.alpha_rld = alpha_rld
-        self.alpha_list = []
-        if generalized_bayes_rld == "power_divergence": #or generalized_bayes is True:
-            for model in self.model_universe:
-                model.generalized_bayes_rld = "power_divergence"
-                model.alpha_rld = self.alpha_rld
-                model.alpha_rld_learning = (
-                        self.alpha_rld_learning)
-            self.jlp_scale = None #initialize the scaling of log probs
-            self.gradient_alpha_rld_count = 0
-            self.gradient_alpha_rld = 0
-        
-        """STEP 3.4: Read in all the SGD-related functions generating stepsize,
-        epsilon (for finite differences) and the loss function"""
-
-        """STEP 3.4.1: Default choices for our functions"""
-        self.C = 1.0
-        if (loss_der_rld_learning is None):
-            loss_der_rld_learning = Detector.bounded_absolute_loss_derivative
-        elif (loss_der_rld_learning == "squared_loss" or
-            loss_der_rld_learning == "squared_loss_derivative"):
-            loss_der_rld_learning = Detector.squared_loss_derivative
-        elif (loss_der_rld_learning == "absolute_loss" or
-              loss_der_rld_learning == "absolute_loss_derivative"):
-            loss_der_rld_learning = Detector.absolute_loss_derivative
-            
-        if loss_param_learning is None:
-            loss_param_learning = Detector.bounded_absolute_loss
-        elif loss_param_learning == "squared_loss":
-            loss_param_learning = Detector.squared_loss
-        elif loss_param_learning == "absolute_loss":
-            loss_param_learning = Detector.absolute_loss
-            
-        if step_size_rld_learning is None:
-            step_size_rld_learning = Detector.step_size_gen_rld
-        if step_size_param_learning is None:
-            step_size_param_learning = Detector.step_size_gen_rld
-        if eps_param_learning is None:
-            eps_param_learning = Detector.eps_gen
-        
-        """STEP 3.4.2: Set the Detector attribute functions """
-        self.loss_der_rld_learning = loss_der_rld_learning 
-        self.loss_param_learning = loss_param_learning
-        #DEBUG: Get some default functions here that make sense!
-        self.step_size_rld_learning = step_size_rld_learning 
-        self.step_size_param_learning = step_size_param_learning
-        if step_size_param_learning is None:
-            self.step_size_param_learning = (
-                    Detector.default_step_size_param_learning)
-        self.eps_param_learning = eps_param_learning
-        
-        self.all_retained_run_lengths = np.array([], dtype=int)
-                
                 
     def reinstantiate(self, new_model_universe):
         """clone this detector """        
@@ -286,7 +164,6 @@ class Detector:
         save_performance_indicators = self.save_performance_indicators
         training_period = self.training_period
         
-        #DEBUG: Needs updating.
         """STEP 2: Create the new detector, and return it"""
         new_detector = Detector(data, model_universe, model_prior, cp_model, 
                  S1, S2, T, exo_data, num_exo_vars, threshold,
@@ -333,7 +210,6 @@ class Detector:
         #       full covariance matrix form & compress them into internal form
         """
         
-        
         """STEP 1: If t==1, initialize *joint_probabilities* and the 
         predictive distributions. 
         If t>1, update the *joint_probabilities* of (y_{1:t}, r_t =r|q_t =q) 
@@ -349,18 +225,8 @@ class Detector:
         """If we want the fixed-parameter NLL, we need to compute and store it
         before we update the joint log prob"""
         #if(self.save_performance_indicators and t>self.training_period):
-            #self.compute_negative_log_likelihood_fixed_pars(y,t) #these need to      
-        #INSERT: alpha_param update here!
-        """For all parameter-DPD models in our model universe, first update 
-        their value of alpha_param"""
-        if self.max_lag_length + 3 < t and self.alpha_param_opt_t < t:
-            #only do if MAP has changed last iteration!
-            if t > 3:
-                if self.CPs[t-2][-1][0] != self.CPs[t-3][-1][0]:
-                    self.alpha_opt_count = self.alpha_opt_count  + 1
-                    self.update_alpha_param(y,self.alpha_opt_count, True)
-                else:
-                    self.update_alpha_param(y,self.alpha_opt_count, False)
+            #self.compute_negative_log_likelihood_fixed_pars(y,t) #these need to
+                
         self.update_all_joint_log_probabilities(y, t)
         
         """STEP 1+: If we want to save the negative log likelihood, do it here
@@ -385,33 +251,8 @@ class Detector:
         #self.update_model_and_run_length_log_distribution(t)
         self.update_run_length_log_distribution(t) #this is stored on detector level
                                                    #and computed from the model objects
-        #DEBUG: This was meant to provide numerical stability, but doesn't work
-#        if (not self.not_all_initialized and 
-#            self.generalized_bayes_rld == "power_divergence"):
-#            self.rescale_DPD_run_length_log_distribution(t) #avoid numerical issues
         
-        """STEP 5: Using the results from STEP 3, obtain a prediction for the
-        next spatial lattice slice, which you preferably should either store, 
-        output, or write to some location""" 
-        if not self.not_all_initialized:
-            self.prediction_y(y, t)
-            self.storage(t) 
-        
-        """STEP 8: Update alpha if you do power-divergence based inference. 
-        Only start doing this once all models have been initialized"""
-        if ((not self.not_all_initialized) and 
-            self.generalized_bayes_rld == "power_divergence" and
-            self.alpha_rld_learning and
-            self.alpha_rld_opt_t < t):
-            #only do this step if MAP CP has changed!
-            if t >= 3: 
-                if self.CPs[t-2][-1][0] != self.CPs[t-3][-1][0]:
-                    #alpha opt count already updated in param update
-                    #self.alpha_opt_count = self.alpha_opt_count  + 1
-                    self.update_alpha_rld(y,self.alpha_opt_count,True)
-                else:
-                    self.update_alpha_rld(y,self.alpha_opt_count,False)
-        
+
         """STEP 4: Check if all models have been initialized. This only needs
         to be checked for BVAR models. If they have all been initialized last
         round (i.e., self.not_all_initialized = False), then there is never any
@@ -430,7 +271,12 @@ class Detector:
             else:
                 self.not_all_initialized = False
             
-       
+        """STEP 5: Using the results from STEP 3, obtain a prediction for the
+        next spatial lattice slice, which you preferably should either store, 
+        output, or write to some location""" 
+        if not self.not_all_initialized:
+            self.prediction_y(y, t)
+            self.storage(t) 
         
         """STEP 6: Using the results from STEP 3, obtain a MAP for the 
         most likely segmentation & models per segment using the algorithm of
@@ -443,201 +289,7 @@ class Detector:
         be the posterior expectation/variance"""
         if not self.not_all_initialized:
             self.update_priors(t)
-     
-    def rescale_DPD_run_length_log_distribution(self, t):
-        """STEP 1: Compute the mean of all joint log probs (note that since
-        they are computed with the DPD, they will be positive!)"""
-        if self.jlp_scale is None:
-            log_scale_new = (np.max([model.joint_log_probabilities 
-                        for model in self.model_universe]) - 1)
-#            log_scale_new = max(1.0, scipy.misc.logsumexp([
-#                        model.joint_log_probabilities 
-#                        for model in self.model_universe]) - 1)
-            rescaler_for_old_obs = None
-        else:
-            log_scale_old = self.jlp_scale
-#            max_ = (np.max([model.joint_log_probabilities 
-#                        for model in self.model_universe]) - 1)
-            min_ = (np.min([model.joint_log_probabilities 
-                        for model in self.model_universe]) - 1)
-#            mean_ = ((1.0/(self.Q + len(self.all_retained_run_lengths))) * 
-#                     scipy.misc.logsumexp([model.joint_log_probabilities 
-#                        for model in self.model_universe]))
-#            log_scale_new = scipy.misc.logsumexp(
-#                    [model.joint_log_probabilities 
-#                        for model in self.model_universe])
-            log_scale_new = min_ #0.5 * max(max_-min_, 2) #min(log_scale_old, 
-#                    (np.max([model.joint_log_probabilities 
-#                        for model in self.model_universe]) - 1))
-#            log_scale_new = max(1.0, scipy.misc.logsumexp([model.joint_log_probabilities 
-#                        for model in self.model_universe]))
-            rescaler_for_old_obs =  log_scale_old - log_scale_new        
-        
-#         -1 = nothing will be negative
-        
- #        only applied to most recent obs = np.log(scale_old/scale_new)
-        self.jlp_scale = log_scale_new
-#        log_scale_new = scipy.misc.logsumexp([model.joint_log_probabilities 
-#                        for model in self.model_universe])
-         
-#        """STEP 2: Use this mean to rescale all of them"""
-        #for model in self.model_universe:
-            #probabilitiy level call
-            #model.rescale_DPD_run_length_distribution(log_scale_new, 
-            #                                          None, #rescaler_for_old_obs, #rescaler_for_old_obs, #rescaler_for_old_obs, 
-            #                                          t)
-        
-
-    def update_alpha_param(self, y, t, update=True):
-        """Use the posterior expectation for alpha + eps and alpha - eps to 
-        approximate the gradient for Loss(PredError(alpha)) w.r.t. alpha.
-        If alpha_param_learning = individual, then you optimize each DPD model
-        independently. If learning = together, optimize together"""
-        
-        """STEP 1: If we learn jointly over all DPD models, get their model
-        posterior probabilities s.t. we can get 
-         E[y_t|y_1:t-1, alpha_t-1 + eps] = sum(
-                 E[y_t|y_1:t-1, m_t-1, alpha_t-1 + eps]) * 
-                 P(m_t-1|y_1:t-1,alpha_t-1 + eps)
-            )
-        where we have stored P(m_t-1|y_1:t-1,alpha_t-1 + eps) from before"""
-        
-        if self.alpha_param_learning == "together":
-            """STEP 1A: If we optimize alpha_param over all models"""
-            #number_DPD_models = 0
-            eps = self.eps_gen(t-1) #as the eps is from the previous iteration
-            DPD_model_indices = []
-            list_model_log_evidences_p_eps = []
-            list_model_log_evidences_m_eps = []
-            list_post_mean_p_eps = []
-            list_post_mean_m_eps = []
             
-            """STEP 1A.1: count number of DPD models and retrieve both their
-            model evidences and posterior expectations"""
-            for (m, model) in zip(range(0, self.Q), self.model_universe):
-                if isinstance(model, BVARNIGDPD):
-                    """retrieve P(m_t-1, y_1:t-1|alpha_t-1 +/- eps)"""
-                    list_model_log_evidences_p_eps.append(
-                            model.model_log_evidence_p_eps)
-                    list_model_log_evidences_m_eps.append(
-                            model.model_log_evidence_m_eps)
-                    """retrieve E[y_t|m_t-1, y_1:t-1, alpha_t-1 +/- eps]"""
-                    list_post_mean_p_eps.append(model.
-                            post_mean_p_eps)
-                    list_post_mean_m_eps.append(model.
-                            post_mean_m_eps)
-                    """get index of this DPD model"""
-                    DPD_model_indices.append(m)
-                    
-            
-            """STEP 1A.2: compute the posterior means for alpha +/- eps"""
-            
-            """STEP 1A.2.1: Get the model posteriors for alpha +/- eps"""
-            total_evidence_p_eps = scipy.misc.logsumexp(
-                    list_model_log_evidences_p_eps)
-            total_evidence_m_eps = scipy.misc.logsumexp(
-                    list_model_log_evidences_m_eps)
-            model_posteriors_p_eps = np.exp(
-                np.array(list_model_log_evidences_p_eps)
-                - total_evidence_p_eps)
-            model_posteriors_m_eps = np.exp(
-                np.array(list_model_log_evidences_m_eps)
-                - total_evidence_m_eps)            
-            """STEP 1A.2.2: Get the posterior mean"""
-            post_mean_p_eps = (np.array(list_post_mean_p_eps) 
-                               * model_posteriors_p_eps[:,np.newaxis])
-            post_mean_m_eps = (np.array(list_post_mean_m_eps)
-                               * model_posteriors_m_eps[:,np.newaxis])
-            
-            """STEP 1A.3: Compute predictive loss and take gradient step"""
-            #DEBUG: use more general loss functions
-            loss_p_eps = self.loss_param_learning(post_mean_p_eps - 
-                                                  y.flatten(), self.C)
-            loss_m_eps = self.loss_param_learning(post_mean_m_eps - 
-                                                  y.flatten(), self.C)
-            self.gradient_alpha_param = (self.gradient_alpha_param + 
-                                         (loss_p_eps - loss_m_eps)/(2*eps))
-            #DEBUG: Use more general step sizes
-            self.gradient_alpha_param_count = (self.gradient_alpha_param_count
-                                               + 1)
-            
-            #bound alpha_param between pow(10,-10) and 10
-            if update:
-                step_size = self.step_size_param_learning(t)
-                #abs_increment = min(abs(step_size * self.gradient_alpha_param),
-                #                    0.05)
-                abs_increment = min(0.1, 
-                        step_size * 
-                        (1.0/self.gradient_alpha_param_count)*
-                        self.gradient_alpha_param)
-                self.alpha_param = min(
-                        max(
-                            pow(10,-10), 
-                            self.alpha_param - 
-                            abs_increment * 
-                            np.sign(self.gradient_alpha_param) #step_size * gradient_alpha_param
-                        ), 
-                        10.0
-                    )
-                self.gradient_alpha_param = 0
-                self.gradient_alpha_param_count = 0
-            #print("detector alpha param", self.alpha_param)
-            
-                """STEP 1A.4: For each DPD model, update alpha_param"""
-                for m in DPD_model_indices:
-                    self.model_universe[m].alpha_param = self.alpha_param
-                    self.model_universe[m].alpha_param_list.append(
-                            self.alpha_param)
-            
-             
-        elif self.alpha_param_learning == "individual":
-            """STEP 1B: If we optimize alpha_param individually"""
-            for (m, model) in zip(range(0, self.Q), self.model_universe):
-                if isinstance(model, BVARNIGDPD):
-                    #eps = self.eps_gen(t-1)
-                    #DEBUG: use more general loss functions
-                    loss_p_eps = np.sum(np.abs(model.post_mean_p_eps - 
-                                               y.flatten()))
-                    loss_m_eps = np.sum(np.abs(model.post_mean_m_eps - 
-                                               y.flatten()))
-                    self.gradient_alpha_param[m] = (self.gradient_alpha_param[m] + 
-                                                 (loss_p_eps - loss_m_eps)/
-                                            (2 * model.eps))
-                    self.gradient_alpha_param_count[m] = (
-                            self.gradient_alpha_param_count[m]+ 1)
-                    
-                    #bound alpha_param between pow(10,-10) and 10
-                    #scale the step size by model complexity to counteract 
-                    #higher variance for more complex models
-                    if update:
-                        #print("PARAM gradient size:", self.gradient_alpha_param[m]/self.gradient_alpha_param_count[m])
-                        step_size = self.step_size_param_learning(t)
-                        abs_increment = min(0.1, 
-                                    step_size * 
-                                    (1.0/self.gradient_alpha_param_count[m])*
-                                    self.gradient_alpha_param[m])
-                        model.alpha_param = min(
-                                    max(
-                                        pow(10,-10), 
-                                        model.alpha_param - 
-                                        abs_increment * 
-                                        np.sign(self.gradient_alpha_param[m]) #step_size * gradient_alpha_param
-                                    ), 
-                                    10.0
-                                )
-#                        model.alpha_param = min(
-#                                max(
-#                                    pow(10,-10), 
-#                                    model.alpha_param 
-#                                    + step_size * (1.0/(model.num_regressors+1)) * 
-#                                      self.gradient_alpha_param[m]
-#                                ), 
-#                                10.0
-#                            )
-                        #print("model alpha param", model.alpha_param)
-                        model.alpha_param_list.append(model.alpha_param)
-                        self.gradient_alpha_param[m] = 0
-                        self.gradient_alpha_param_count[m] = 0
 
     def update_run_length_log_distribution(self, t):
         """This function aggregates the models' individual model and run-length
@@ -761,162 +413,7 @@ class Detector:
         
         #if not self.first_model_initialized:
             #we need the initial run-length distro
-        
-        
-        """If we need to do hyperparameter learning for the generalized
-        Bayesian case (e.g., learning alpha for Power divergence)"""
-        
-        """Initialize these quantities. If we enter the next if-statement, they
-        might be changed"""
-        log_model_posteriors_der_m = None
-        log_model_posteriors_der_sign_m = None
-        log_CP_evidence_der = None 
-        log_CP_evidence_der_sign = None
-        
-        if (self.generalized_bayes_rld == "power_divergence"  
-            and self.alpha_rld_learning
-            and t>1):
-            #DEBUG: Need to be computed from all models
-            """Compute the model posterior derivative w.r.t. alpha 
-            (in log form)"""
             
-            
-            """Check if at least one model is already initialized"""
-            at_least_one_model_initialized = np.any([(model.has_lags and 
-                ((t) - model.lag_length)>1) or ( not model.has_lags ) 
-                for model in self.model_universe])
-            
-            if at_least_one_model_initialized:
-                """collect all derivatives of all models as well as the 
-                joint probabilities of all models. Sum over models per run-
-                length afterwards"""
-                all_log_probs = -np.inf*np.ones(
-                        (self.Q, np.size(self.all_retained_run_lengths)))
-                all_log_alpha_derivatives = -np.inf*np.ones(
-                        (self.Q, np.size(self.all_retained_run_lengths)))
-                all_log_alpha_derivatives_sign = np.zeros(
-                        (self.Q, np.size(self.all_retained_run_lengths)))
-                for m, model in zip(range(0,self.Q), self.model_universe):
-                    #DEBUG: Unclear if the log derivatives joint log probs
-                    #       are going to be one entry too many (for r=0)
-                    #DEBUG: Indexing!
-                    
-                    """Only retrieve quantities of models that have seen data 
-                    already"""
-                    warmed_up = ((model.has_lags and ((t) - model.lag_length)>1) or
-                        ( not model.has_lags ))
-                    if warmed_up:
-                    
-                        """get indices relative to all run lengths"""
-                        model_indices_indicators_relative_to_all_run_lengths=(
-                            np.in1d(self.all_retained_run_lengths, 
-                                    model.retained_run_lengths))
-                        if (model.retained_run_lengths[-1] == 
-                            model.retained_run_lengths[-2]):
-                            model_indices_indicators_relative_to_all_run_lengths[-1] = True    
-                        
-        #                        print('rl', np.size(model_indices_indicators_relative_to_all_run_lengths))
-        #                        print(model_indices_indicators_relative_to_all_run_lengths)
-        #                        print(self.all_retained_run_lengths)
-        #                        print('jlp', np.size(model.joint_log_probabilities))
-        #                        print('alp', np.size(all_log_probs[m,:]))
-                        #DEBUG: The initial log_alpha_derivative_joint_probs
-                        #       has to be in the right size relative to lag l.
-                        #DEBUG: Initialized to None, so initialize it when you
-                        #       arrive here the first time by checking if = None
-                        """Check if they have been initialized already. If not,
-                        we need to do that now"""
-                        if (model.log_alpha_derivatives_joint_probabilities 
-                            is None):
-                            num_needed = np.sum(
-                             model_indices_indicators_relative_to_all_run_lengths)
-                            model.log_alpha_derivatives_joint_probabilities = (
-                                    -np.inf * np.ones(num_needed))
-                            model.log_alpha_derivatives_joint_probabilities_sign = (
-                                    np.ones(num_needed))
-                        
-                        """fill retrieved values into relevant position"""
-                        all_log_alpha_derivatives[m,
-                         model_indices_indicators_relative_to_all_run_lengths]=(
-                            model.log_alpha_derivatives_joint_probabilities )
-                        all_log_alpha_derivatives_sign[m,
-                         model_indices_indicators_relative_to_all_run_lengths]=( 
-                         model.log_alpha_derivatives_joint_probabilities_sign)
-                        
-                        #DEBUG: it seems that we don't have enough retained
-                        #       indices in the relative ones
-                        all_log_probs[m,  
-                         model_indices_indicators_relative_to_all_run_lengths]=( 
-                         model.joint_log_probabilities)
-                            
-                """sum over the models for each run-length, needed for the
-                derivative of P(m_t|m_t-1, r_t-1, y_1:t-1), see (4) in 
-                handwritten notes. Dimension is Rx1"""
-                model_sums_derivatives, model_sums_derivatives_sign = (
-                    scipy.misc.logsumexp(
-                        a = all_log_alpha_derivatives,
-                        b = all_log_alpha_derivatives_sign,
-                        return_sign = True,
-                        axis=0
-                    ))
-                model_sums = scipy.misc.logsumexp(
-                        a = all_log_probs, 
-                        axis = 0
-                    )
-                
-                """Get the two expressions that added together give you the
-                derivative of the joint probabilities in log-form"""
-                #Debug: In expr_1, we have MxR - M, make sure dimensions
-                #       match. expr_2 has dimension R
-                #DEBUG: check expr_2 and fix the dimension
-                expr_1 = all_log_alpha_derivatives - model_sums
-                sign_1 = all_log_alpha_derivatives_sign
-                expr_2 = -2* model_sums + model_sums_derivatives + all_log_probs
-                sign_2 = (-1) * model_sums_derivatives_sign
-                
-                #print("expr_1", expr_1)
-                #print("expr_2", expr_2)
-#                print("sign_1", sign_1.shape)
-#                print("sign_2", sign_2.shape)
-                
-                expr, sign = scipy.misc.logsumexp(
-                        a = np.array([expr_1, expr_2]),
-                        b = np.array([sign_1, sign_2 * 
-                                      np.ones(self.Q)[:,np.newaxis]]),
-                        return_sign = True,
-                        axis=0
-                    )
-                
-                #Note: We only have the growth-probabilities in here! 
-                #      the CP probability derivatives are computed below!
-                log_model_posteriors_der = expr
-                log_model_posteriors_der_sign = sign
-                
-                """Compute the CP evidence derivative w.r.t. alpha 
-                (in log form). It turns out that the computation decomposes
-                s.t. we have 
-                    derivative(one-step-pred) * CP_evidence * q(m_t) + 
-                    one-step-pred * derivative(CP_evidence) * q(m_t). 
-                Since we don't  want to deal with the one-step-ahead 
-                predictives here, all we need to do is compute 
-                derivative(CP_evidence) and pass it on. The full 
-                computation is then done when we update the probs."""
-                #DEBUG: Where does the evidence come from?
-                #DEBUG: Unclear what we compute here and inside probability_model!
-                _1, _2 = misc.logsumexp(
-                        a = np.log(self.cp_model.hazard_vector(1, t)) + 
-                            all_log_alpha_derivatives, # + 
-                            #self.log_evidence,
-                        b = all_log_alpha_derivatives_sign,
-                        return_sign = True)
-                log_CP_evidence_der = _1
-                log_CP_evidence_der_sign = _2
-        
-#            else:
-#                log_model_posteriors_der_m = None
-#                log_model_posteriors_der_sign_m = None
-#                log_CP_evidence_der = None 
-#                log_CP_evidence_der_sign = None
     
         #q = 0
         for (m,model) in zip(range(0,self.Q),self.model_universe):
@@ -938,7 +435,7 @@ class Detector:
                 of each model."""
                 
                 """NOTE: We need to initialize BVAR at time t-lag_length!"""
-                if model.has_lags or isinstance(model, BVARNIG):
+                if model.has_lags:
                      """If we have a BVAR model, we need to pass data of
                      sufficient lag length to the initialization."""
                      #DEBUG: exo_selection in correct dimension? What is dim of
@@ -962,25 +459,7 @@ class Detector:
                                     self.model_prior[m]/prior_rescaling_factor)
                 else:
                      """Otherwise, just pass the first observation"""
-                     #DEBUG: CONSTANT FITTING ADAPTION
-#                     if isinstance(model, BVARNIG):
-#                         """STEP I: Get endogeneous data"""
-#                         X_endo = self.data[:model.lag_length+1,:]
-#                         Y_2 = self.data[model.lag_length+1,:]
-#                         """STEP II: Get exogeneous data (if needed)"""
-#                         if model.exo_bool:
-#                             X_exo = self.exo_data[model.lag_length, 
-#                                                   model.exo_selection,:]
-#                             X_exo_2 = self.exo_data[model.lag_length+1,
-#                                                     model.exo_selection,:]
-#                         else:
-#                             X_exo = X_exo_2 = None
-#                         model.initialization(None, X_exo, Y_2, X_exo_2,
-#                                    self.cp_model,
-#                                    self.model_prior[m]/prior_rescaling_factor)
-                     #else:
-                     model.initialization(y, self.cp_model, 
-                                              self.model_prior[m])
+                     model.initialization(y, self.cp_model, self.model_prior[m])
             else:
                 """Make sure that we only modify joint_log_probs & predictive
                 distributions for BVAR models for which t is large enough to
@@ -1002,12 +481,8 @@ class Detector:
                 ALL models, so it will have -np.inf entries at
                 run-lengths retained for other models. That's why we need
                 to access its retained run lengths"""
-                warmed_up = ((model.has_lags and ((t) - model.lag_length)>1) or
-                    ( not model.has_lags ))
-                #warmed_up_plus_one = (
-                #    (model.has_lags and ((t) - model.lag_length)>2) or
-                #    ( not model.has_lags  and t > 1))
-                if warmed_up:
+                if ((model.has_lags and ((t) - model.lag_length)>1) or
+                    ( not model.has_lags )):
                     #print("self.model_and_run_length_log_distr[m,:] ", 
                     #      self.model_and_run_length_log_distr)
                     #print("self.run_length_log_distr ", 
@@ -1038,99 +513,22 @@ class Detector:
                             self.log_evidence)
                             #model.joint_log_probabilities)
                     #print("log CP evidence:", log_CP_evidence)
-                    if (self.generalized_bayes_rld == "power_divergence"  
-                        and self.alpha_rld_learning):
-                        
-                        """get indices relative to all run lengths"""
-                        model_indices_indicators_relative_to_all_run_lengths=(
-                            np.in1d(self.all_retained_run_lengths, 
-                                    model.retained_run_lengths))
-                        if (model.retained_run_lengths[-1] == 
-                            model.retained_run_lengths[-2]):
-                            model_indices_indicators_relative_to_all_run_lengths[-1] = True  
-                        
-                        """Retrieve m-th entry of the calculated quantities"""
-                        log_model_posteriors_der_m = (
-                            log_model_posteriors_der[m,
-                            model_indices_indicators_relative_to_all_run_lengths])
-                        log_model_posteriors_der_sign_m = (
-                            log_model_posteriors_der_sign[m,
-                            model_indices_indicators_relative_to_all_run_lengths])
-                        #DEBUG: needs to be one-dimensional!
-                        #log_CP_evidence_der_m = (log_CP_evidence_der[m])
-                        #log_CP_evidence_der_sign_m = (
-                        #       log_CP_evidence_der_sign[m])
+                    
 
-
-                
                 """NOTE: If it is a BVAR model, we need the exogeneous vars,
                          and we also need to make sure that lag < t"""
                 if(model.has_lags and ((t) - model.lag_length)>1):
-                    """NOTE: This needs to be adjusted once we allow for 
-                    exogeneous variables"""
-                    
-                      
-                    #We want the model posteriors to be passed in only from
-                    #this model!
-                    
-                    #DEBUG: Add a function for alpha_param learning step here.
-                    #       Needs to happen before the joint log probs are 
-                    #       updated (as then, we can already use the new alpha
-                    #       for the new joint log probs). Make it a probability
-                    #       model level function that does nothing by default,
-                    #       unless you extend it in your subclass.
-                    if (t - model.lag_length)>2 and self.alpha_param_opt_t <= t:
-                        #DEBUG: This calls aDPD_joint_log_prob_updater, which
-                        #       in turns calls the integral computation. 
-                        model.alpha_param_gradient_computation(y=y, t=t, 
-                             cp_model = self.cp_model,
-                             model_prior =
-                                 self.model_prior[m]/prior_rescaling_factor,
-                             log_model_posteriors = log_model_posteriors,
-                             log_CP_evidence = log_CP_evidence,
-                             eps = self.eps_param_learning(t))
-                    
-                    model.update_joint_log_probabilities(
-                        y=y,t=t, cp_model = self.cp_model, 
-                        model_prior = 
-                            self.model_prior[m]/prior_rescaling_factor,
-                        log_model_posteriors = log_model_posteriors,
-                        log_CP_evidence = log_CP_evidence, 
-                        log_model_posteriors_der = log_model_posteriors_der_m, 
-                        log_model_posteriors_der_sign = 
-                            log_model_posteriors_der_sign_m,
-                        log_CP_evidence_der = log_CP_evidence_der, 
-                        log_CP_evidence_der_sign = log_CP_evidence_der_sign, 
-                        do_general_bayesian_hyperparameter_optimization = (
-                                warmed_up))
-                    
-                #DEBUG: CONSTANT FITTING ADAPTION    
+                    #print("mrld", self.model_and_run_length_log_distr[m,:])# -
+                            #self.run_length_log_distr)
+                    #print("log model posterior", log_model_posteriors)
+                    model.update_joint_log_probabilities(y, t, 
+                        self.cp_model, self.model_prior[m]/prior_rescaling_factor,
+                        log_model_posteriors, log_CP_evidence)
                 elif( not model.has_lags ):
-                    """NOTE: This does not allow for exogeneous variables"""
                     #impose condition s.t. BVAR is not called
-                    if t > 2 and self.alpha_param_opt_t <= t:
-                        model.alpha_param_gradient_computation(y=y, t=t, 
-                             cp_model = self.cp_model,
-                             model_prior =
-                                 self.model_prior[m]/prior_rescaling_factor,
-                             log_model_posteriors = log_model_posteriors,
-                             log_CP_evidence = log_CP_evidence,
-                             eps = self.eps_param_learning(t))
-                    
-                    model.update_joint_log_probabilities(
-                        y=y,t=t, cp_model = self.cp_model, 
-                        model_prior = 
-                            self.model_prior[m]/prior_rescaling_factor,
-                        log_model_posteriors = log_model_posteriors,
-                        log_CP_evidence = log_CP_evidence,
-                        log_model_posteriors_der = log_model_posteriors_der_m, 
-                        log_model_posteriors_der_sign = 
-                            log_model_posteriors_der_sign_m, 
-                        log_CP_evidence_der = log_CP_evidence_der, 
-                        log_CP_evidence_der_sign = log_CP_evidence_der_sign, 
-                        do_general_bayesian_hyperparameter_optimization = (
-                                warmed_up))
-                    
+                    model.update_joint_log_probabilities(y,t, 
+                        self.cp_model, self.model_prior[m]/prior_rescaling_factor,
+                        log_model_posteriors, log_CP_evidence)   
                     
                     
                 """STEP 2: Update the predictive probabilities for each model
@@ -1142,7 +540,6 @@ class Detector:
                 
                 """NOTE: If it is a BVAR model, we need the exogeneous vars,
                          and we also need to make sure that lag < t"""
-                #DEBUG: CONSTANT FITTING ADAPTION
                 if(model.has_lags and ((t) - model.lag_length)>1):
 
                     y_tm1 = self.data[t-2,:]
@@ -1151,361 +548,14 @@ class Detector:
                         x_exo_tp1 = self.exo_data[t+1,model.exo_selection,:]
                     else:
                         x_exo_t = x_exo_tp1 = None
-                    if isinstance(model, BVARNIGDPD):
-                        """If BVARNIGDPD model, we need the CP probability to
-                        obtain the prior weights in the SGD step"""
-                        model.update_predictive_distributions(y, y_tm1, 
-                                x_exo_t, x_exo_tp1, t, self.cp_model.hazard(0))
-                    else:
-                        """If not DPD model, we don't need CP probability"""
-                        model.update_predictive_distributions(y, y_tm1, 
-                                 x_exo_t, x_exo_tp1, t)
+                    model.update_predictive_distributions(y, y_tm1, 
+                                                          x_exo_t, x_exo_tp1, t)
                 elif(not model.has_lags):
-                    if isinstance(model, BVARNIG):
-                        """If it is a BVARNIG model, call the more complicated
-                        functions"""
-                        y_tm1 = self.data[t-2,:]
-                        if model.exo_bool:
-                            x_exo_t = self.exo_data[t,model.exo_selection,:]
-                            x_exo_tp1 = self.exo_data[t+1,
-                                                      model.exo_selection,:]
-                        else:
-                            x_exo_t = x_exo_tp1 = None
-                        if isinstance(model, BVARNIGDPD):
-                            """If BVARNIGDPD model, we need the CP probability 
-                            to obtain the prior weights in the SGD step"""
-                            model.update_predictive_distributions(y, y_tm1, 
-                                    x_exo_t, x_exo_tp1, t, \
-                                    self.cp_model.hazard(0))
-                        else:
-                            """If not DPD model, we don't need CP probability"""
-                            model.update_predictive_distributions(y, y_tm1, 
-                                     x_exo_t, x_exo_tp1, t)
-                    else:
-                        model.update_predictive_distributions(y, t)
+                    model.update_predictive_distributions(y, t)
                 
-
-    def update_alpha_rld(self,y,t, update=True):
-        """Using a loss function that can be specified as input, update alpha
-        using stochastic gradient descent"""        
-        
-        """STEP 1: Retrieve the logs of the alpha-derivatives in each model"""
-        num_run_lengths = int(len(self.all_retained_run_lengths))
-        all_log_alpha_derivatives = -np.inf*np.ones(
-                (self.Q, num_run_lengths))
-        all_log_alpha_derivatives_sign = np.zeros(
-                (self.Q, num_run_lengths))
-        all_log_probs = -np.inf*np.ones(
-                (self.Q, num_run_lengths))
-        #all_log_one_step_preds = -np.inf*np.ones((self.Q, num_run_lengths))
-
-        for m, model in zip(range(0,self.Q), self.model_universe):
-            #DEBUG: Unclear if the log derivatives joint log probs
-            #       are going to be one entry too many (for r=0)
-            
-            """get indices relative to all run lengths"""
-            model_indices_indicators_relative_to_all_run_lengths = np.in1d(
-                    self.all_retained_run_lengths, model.retained_run_lengths)
-            """If the current model has retained run length r>t-1, set it 
-            to t."""
-            if (model.retained_run_lengths[-1] == model.retained_run_lengths[-2]):
-                model_indices_indicators_relative_to_all_run_lengths[
-                            -1] = True          
-            all_log_alpha_derivatives[m,
-                model_indices_indicators_relative_to_all_run_lengths] = (
-                model.log_alpha_derivatives_joint_probabilities )
-            all_log_alpha_derivatives_sign[m,
-             model_indices_indicators_relative_to_all_run_lengths] = (
-             model.log_alpha_derivatives_joint_probabilities_sign)
-            all_log_probs[m,
-             model_indices_indicators_relative_to_all_run_lengths] = (
-             model.joint_log_probabilities)
-            #needed if we base loss on P(y_t|y_1:t-1) PROLBEM: This happens AFTER the update, i.e.
-            #we have our mrld updated, but the old predictives
-            #all_log_one_step_preds[m,
-            # model_indices_indicators_relative_to_all_run_lengths] = (
-            # model.one_step_ahead_predictive_log_probs)
-
-        #r0_log_prob
-        """STEP 2: Sum over all the joint log probs' derivatives"""
-        sum_derivatives, sum_derivatives_sign = scipy.misc.logsumexp(
-                a = all_log_alpha_derivatives, 
-                b = all_log_alpha_derivatives_sign,
-                return_sign = True)
-        
-        """STEP 3: obtain the log of the gradient of P(r_t, m_t|y_1:t).
-        NOTE: np.abs(term_1_sign) gives you all the run-length entries per 
-        model that are non-zero, so multiplying by it ensure we leave zero
-        entries zero!"""
-        term_1 = all_log_alpha_derivatives - self.log_evidence
-        term_1_sign = all_log_alpha_derivatives_sign
-        term_2 = sum_derivatives - 2.0*self.log_evidence + all_log_probs
-        term_2_sign = (-1) * sum_derivatives_sign * np.abs(term_1_sign)
-        
-        run_length_and_model_log_der, run_length_and_model_log_der_sign = (
-            scipy.misc.logsumexp(
-                a = np.array([term_1, np.abs(term_1_sign) * term_2]),
-                b = np.array([term_1_sign, term_2_sign]), 
-                return_sign = True,
-                axis = 0
-            ))
-        
-        """STEP 4: Lastly, get the gradient of the posterior expectation
-        NOTE: This need not be the gradient. We could equivalently use any 
-        posterior property Q that can be computed for each (r_t, m_t) in closed
-        form (i.e. we get a weighted posterior using the MRLD(r,m) * Q(r,m))"""
-        if True: #self.loss_type == "posterior_expectation":
-            """STEP 4.1: Get the deviation from posterior expectation"""
-            resid =  self.y_pred_mean.flatten() - y.flatten()
-            #self.y_pred_var
-            
-            """STEP 4.2: Get the derivative of the posterior expectation"""
-            post_mean_der = np.zeros(shape=(self.S1 * self.S2)) 
-            for (m, model) in zip(range(0, self.Q), self.model_universe):
-                
-                """Get the number of stored run lengths for this model"""
-                num_rl = np.size(model.retained_run_lengths)
-                
-                """get indices relative to all run lengths"""
-                model_indices_indicators_relative_to_all_run_lengths = np.in1d(
-                        self.all_retained_run_lengths, model.retained_run_lengths)
-                """If the current model has retained run length r>t-1, set it 
-                to t."""
-                if (model.retained_run_lengths[-1] == model.retained_run_lengths[-2]):
-                    model_indices_indicators_relative_to_all_run_lengths[
-                                -1] = True  
-
-                """weighing expectation with model & run-length probabilities'
-                derivatives"""
-                post_mean_der = (post_mean_der + 
-                    np.sum(
-                    np.reshape(model.get_posterior_expectation(t), 
-                        newshape = (num_rl, self.S1 * self.S2)) * 
-                    #overflow in exp!
-                    (np.exp(run_length_and_model_log_der[m,
-                        model_indices_indicators_relative_to_all_run_lengths]) *
-                        run_length_and_model_log_der_sign[m,
-                        model_indices_indicators_relative_to_all_run_lengths])
-                        [:,np.newaxis], 
-                        axis = 0)
-                    )
-            
-        if False: #self.loss_type = "posterior_expectation"
-            post_prob_log = -np.inf
-            post_prob_der_log = -np.inf
-            post_prob_der_log_sign = 1.0
-            
-            
-            for (m, model) in zip(range(0, self.Q), self.model_universe):
-                """Get the number of stored run lengths for this model"""
-                num_rl = np.size(model.retained_run_lengths)
-                
-                """get indices relative to all run lengths"""
-                model_indices_indicators_relative_to_all_run_lengths = np.in1d(
-                        self.all_retained_run_lengths, model.retained_run_lengths)
-                """If the current model has retained run length r>t-1, set it 
-                to t."""
-                if (model.retained_run_lengths[-1] == model.retained_run_lengths[-2]):
-                    model_indices_indicators_relative_to_all_run_lengths[
-                                -1] = True 
-                #DEBUG: Just done to ensure that we finish, root problem unclear
-                if (np.sum(model_indices_indicators_relative_to_all_run_lengths) 
-                    > np.size(model.one_step_ahead_predictive_log_probs)):
-                    one_steps = np.insert(model.one_step_ahead_predictive_log_probs,
-                                      0, model.r0_log_prob)
-                else:
-                    one_steps = model.one_step_ahead_predictive_log_probs
-                """rlm log:"""
-#                print("mrl", self.model_and_run_length_log_distr[m][
-#                            model_indices_indicators_relative_to_all_run_lengths].shape)
-#                print("one steps", one_steps.shape)
-                sum_ = scipy.misc.logsumexp(
-                    a = np.array([
-                        self.model_and_run_length_log_distr[m][
-                            model_indices_indicators_relative_to_all_run_lengths],
-                        one_steps
-                    ]))
-                post_prob_log = scipy.misc.logsumexp(
-                        a = np.array([post_prob_log, sum_])
-                        )
-                """rlm log derivative"""
-                sum_, sign_ = scipy.misc.logsumexp(
-                    a = np.array([
-                        run_length_and_model_log_der[m,
-                            model_indices_indicators_relative_to_all_run_lengths],
-                        one_steps
-                        ]),
-                    b = np.array([
-                        run_length_and_model_log_der_sign[m,
-                            model_indices_indicators_relative_to_all_run_lengths],
-                        np.ones(num_rl)]),
-                    return_sign = True)
-                post_prob_der_log, post_prob_der_log_sign = scipy.misc.logsumexp(
-                    a = np.array([post_prob_der_log, sum_]),
-                    b = np.array([post_prob_der_log_sign, sign_]),
-                    return_sign = True)
-                
-#                rlm_log_der = (np.exp(run_length_and_model_log_der[m,
-#                        model_indices_indicators_relative_to_all_run_lengths])*
-#                        run_length_and_model_log_der_sign[m,
-#                        model_indices_indicators_relative_to_all_run_lengths])
-#                """rlm log"""  #probably should leave everything in log form 
-#                rlm_log = self.model_and_run_length_log_distr[m,
-#                    model_indices_indicators_relative_to_all_run_lengths]
-#                post_prob= (post_prob + 
-#                    np.exp(model.one_step_ahead_predictive_log_probs) * 
-#                    np.exp(rlm_log))
-#                post_prob_der = (post_prob_der + 
-#                    np.exp(model.one_step_ahead_predictive_log_probs) * 
-#                    np.exp(rlm_log_der))
-            
-        #resid =  post_prob_log
-        
-        """STEP 4.3: Plug both into the loss to get the gradient"""
-        self.gradient_alpha_rld = (self.gradient_alpha_rld  + 
-                self.loss_der_rld_learning(resid.flatten(), 
-                                           post_mean_der.flatten(),
-                                           self.C)
-                )
-        self.gradient_alpha_rld_count = self.gradient_alpha_rld_count + 1
-#        alpha_gradient = self.loss_der_rld_learning(resid.flatten(), 
-#                                                    post_mean_der.flatten(),
-#                                                    self.C)
-        #DEBUG: Make constant steps
-        
-        """Note: Set number of observations you make before taking a gradient 
-        step, i.e. we estimate the gradient with k observations"""
-        #k=1
-        
-        """STEP 4.4: Gradient descent step"""
-        #relative = pow(10, -1) * 5 * np.abs(self.alpha)
-        #t_eff = len(self.alpha_list) #number of updates
-        #C_1, C_2= 1, 1000 #C_1*((C_2+1)/(t_eff+C_2)) #ad hoc  C_1 * np.exp(-C_2 * t)#
-        step_size = self.step_size_gen(t=t)#, alpha=self.alpha_rld) 
-        min_increment, max_increment = 0.0000, 5/self.T #5/self.T #0.001
-        #grad_sign = np.sign(alpha_gradient)
-        min_alpha, max_alpha = pow(10,-5), 5
-        
-        """Note: this will simply be equal to alpha_gradient for standard
-        SGD, where we take a step at each obs"""
-        #self.gradient = self.gradient + (1.0/k)*alpha_gradient
-        if update:
-            #print("RLD gradient size:", self.gradient_alpha_rld/self.gradient_alpha_rld_count)
-            #print("gradient ", self.gradient)
-            """Update step"""
-            #NOTE: Since our loss functions have MINIMA we want to find, we need to
-            #       do gradient DESCENT, not ASCENT! (for log probability, 
-            #       we do need to do ascent though)
-            
-            #DEBUG: bound the gradient step to avoid chaotic behaviour
-            grad_sign = np.sign(self.gradient_alpha_rld)
-            increment = max(min(max_increment, 
-                                step_size * 
-                                np.abs(self.gradient_alpha_rld) * 
-                                (1.0/ self.gradient_alpha_rld_count)), 
-                            min_increment)
-            self.alpha_rld = min(
-                    max(self.alpha_rld - increment*grad_sign, min_alpha),
-                    max_alpha)
-            self.alpha_list.append(self.alpha_rld)
-        
-            """STEP 4.5: Update the alphas inside the model objects"""
-            for model in self.model_universe:
-                #DEBUG: once we change alpha name in detector, we nee to 
-                #       do the same in models, too
-                model.alpha_rld = self.alpha_rld
-            self.gradient_alpha_rld_count = 0
-            self.gradient_alpha_rld = 0
-            
-    
-    @staticmethod
-    def step_size_gen(t, alpha = None):
-        """gives you sequence 1/n"""
-        if alpha is not None:
-            g0 = min(alpha, 1.0)#pow(10,-10) #2*(alpha) 
-            lamb = 10# max(2.0, alpha) #pow(10,10) #1.0 - alpha 
-            step_size = g0/(1.0 + g0 * lamb * t)
-            return step_size
-        else:
-            g0 = 3.0 #pow(10,-10) #2*(alpha) 
-            lamb = 0.5 # max(2.0, alpha) #pow(10,10) #1.0 - alpha 
-            step_size = g0/(1.0 + g0 * lamb * t)
-            return step_size
-            #return pow(t, -1)
-#        if alpha is None:
-#            return (pow(t, -1))    
-#        else:
-#            return (alpha*pow(t, -1))       
-            
-    @staticmethod
-    def step_size_gen_rld(t, alpha = None):
-        #slowly decreasing magnitude, but small step sizes
-        g0 = 0.05
-        lamb = 0.5
-        step_size = g0/(1.0 + g0 * lamb * t)
-        return step_size
-        
-    @staticmethod
-    def eps_gen(t):
-        """gives you sequence (n)^-0.25"""
-        return pow(t, -0.25)
-    
-    @staticmethod
-    def squared_loss(resid,C):
-        """multivariate squared loss function. Univariate output."""
-        return 0.5*np.sum(np.power(resid, 2))
-    
-    @staticmethod
-    def absolute_loss(resid,C):
-        """just returns the absolute loss, i.e. sum( |Y_pred - Y_t|_i )"""
-        return np.sum(np.abs(resid))
-    
-    @staticmethod
-    def biweight_loss(resid, C):
-        """Get biweight loss"""
-        smallerC = np.where(resid < C)
-        biggerC = int(len(resid) - len(smallerC))
-        return(0.5*np.sum(np.power(resid[smallerC],2))+ 0.5*biggerC*pow(C,2))
-
-    @staticmethod
-    def bounded_absolute_loss(resid, C):
-        """Get biweight loss"""
-        smallerC = np.where(resid < C)
-        biggerC = int(len(resid) - len(smallerC))
-        return(np.sum(np.abs(resid[smallerC]))+ biggerC*C)
-
-    @staticmethod
-    def squared_loss_derivative(resid, post_mean_der,C):
-        """Gives the deriative of sum((resid)^2) wrt alpha_rld"""
-        return(np.sum(2 * resid * post_mean_der))
-    
-    @staticmethod
-    def absolute_loss_derivative(resid, post_mean_der,C):
-        """returns deriative of sum(|resid|) wrt alpha_rld"""
-        return(np.sum(np.sign(resid) * post_mean_der))
-        
-    @staticmethod
-    def biweight_loss_derivative(resid, post_mean_der, C):
-        """gives derivative of the huber loss with constant C"""
-        smallerC = np.where(resid < C)
-        #note: Where resid > C, there we have a flat loss, i.e. gradient=0
-        return(np.sum(2 * resid[smallerC] * post_mean_der[smallerC]))
-    
-    @staticmethod
-    def bounded_absolute_loss_derivative(resid, post_mean_der, C):
-        """gives derivative of the huber loss with constant C"""
-        smallerC = np.where(resid < C)
-        #note: Where resid > C, there we have a flat loss, i.e. gradient=0
-        return(np.sum(np.abs(resid[smallerC]* post_mean_der[smallerC])))
-        
-    
-    #step_size_gen eps_gen
-    
-#    @staticmethod
-#    def log_loss_derivative(log_prob):
-#        """returns 1/x"""
-#        return 1.0/np.exp(log_prob)
-        
+            #"""keep track of q, which is needed for the *model_prior*
+            #indexing in STEP 1 and for the initialization if t==0"""           
+            #q = q + 1
     
     def save_negative_log_likelihood(self,t):
         """Get the negative log likelihood if you want to store it"""
@@ -1553,21 +603,7 @@ class Detector:
         """Get the MSE at t and store it"""
         #DEBUG: Much more natural to do when we already compute posterior expectation...
         #self.y_pred_mean - y
-#        DEBUG = True
-#        if (DEBUG and pow(self.y_pred_mean - y.reshape(self.S1, self.S2),2) > 25
-#            and isinstance(self.model_universe[0], BVARNIGDPD)):
-#            model = self.model_universe[0]
-#            all_exp = model.get_posterior_expectation(t)
-#            map_ = np.argmax(self.model_and_run_length_log_distr)
-#            max_rl = model.retained_run_lengths[map_]
-#            print("t = ", t)
-#            print("run length distro max at", max_rl)
-#            print("expectation at map", all_exp[map_])
-#            print("params at map", model.a_rt[map_], model.b_rt[map_], model.beta_rt[map_,:], model.L_rt[map_,:,:])
-            
-                
         self.MSE.append(pow(self.y_pred_mean - y.reshape(self.S1, self.S2),2))
-        self.MAE.append(abs(self.y_pred_mean - y.reshape(self.S1, self.S2)))
         
     
     #IMPLEMENTED FOR ALL SUBCLASSES IF model_evidence UPDATED CORRECTLY IN SUBLCASS
@@ -1709,8 +745,8 @@ class Detector:
 
 
     def trim_run_length_log_distributions(self, t):
-        """Trim the distributions within each model object by calling a trimmer 
-        on all model objects in the model universe. Pass the threshold down"""
+        """Trim the distributions within each model object by calling a trimmer on
+        all model objects in the model universe. Pass the threshold down"""
         for model in self.model_universe:
             #NOTE: Would be ideal to implement this on probability_model level!
             if model.has_lags:
@@ -1773,7 +809,6 @@ class Detector:
             else:
                 #DEBUG: changed model lag
                 #model_lag = 1
-                #DEBUG: CONSTANT FITTING ADAPTION
                 model_lag = 0
             
             """STEP 2.1: If you have model_lag = t, this means that the model
@@ -1893,13 +928,7 @@ class Detector:
         
 
 
-    @staticmethod
-    def default_step_size_param_learning(t, alpha = None):
-        """Used if no other learning rate specified"""
-        if alpha is None:
-            return (pow(t, -1))    
-        else:
-            return (alpha*pow(t, -1))
+        
 
     
     
